@@ -29,7 +29,7 @@ public:
     }
 };
 
-typedef net::details::PersistentQueue<net::CrtAllocator> DefaultQueue;
+typedef net::details::PersistentQueue<net::CrtAllocator, net::DefaultSettings> DefaultQueue;
 class QueueDefaultCallback
 {
 public:

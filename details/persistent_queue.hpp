@@ -1,4 +1,6 @@
-#include "exception.hpp"
+#pragma once
+
+#include "net/exception.hpp"
 #include "net/settings.hpp"
 
 #include <deque>
@@ -17,19 +19,14 @@ namespace details
 
 template
 <
-        class Allocator,
-        class Settings = DefaultSettings
+        typename Allocator,
+        typename Settings = DefaultSettings
 >
 class PersistentQueue
 {
 public:
-    struct MemHolder
-    {
-        typename Allocator::Memory m_Memory;
-        boost::uint32_t m_Size;
-    };
-
     typedef boost::shared_ptr<PersistentQueue> Ptr;
+    typedef typename Allocator::MemHolder MemHolder;
     typedef boost::function<void(const MemHolder&)> Callback;
 
     PersistentQueue(const Callback& cb)
