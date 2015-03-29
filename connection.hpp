@@ -1,8 +1,13 @@
 #pragma once
 
+#include "allocator.hpp"
+
+#include <vector>
+
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/asio/buffer.hpp>
 
 namespace net
 {
