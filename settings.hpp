@@ -6,19 +6,19 @@ namespace net
 class DefaultSettings
 {
 public:
-    static std::size_t GetQueueMaxElemCount()
+    std::size_t GetQueueMaxElemCount() const
     {
         return 10000;
     }
-    static std::size_t GetQueueMaxByteSize()
+    std::size_t GetQueueMaxByteSize() const
     {
         return 1024 * 1024 * 100; // 100 Mb
     }
-    static std::size_t GetMaxMessageSize()
+    std::size_t GetMaxMessageSize() const
     {
         return 1024 * 1024 * 50; // 50 Mb
     }
-    static std::size_t GetBufferSize()
+    std::size_t GetBufferSize() const
     {
         return 4096;
     }

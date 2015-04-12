@@ -1,5 +1,5 @@
 #include "log/log.h"
-#include "net/details/allocator.hpp"
+#include "net/details/memory.hpp"
 #include "net/details/persistent_queue.hpp"
 
 #include <iostream>
@@ -19,85 +19,82 @@ using ::testing::Expectation;
 class SettingsWithSmallLimits
 {
 public:
-    static std::size_t GetQueueMaxElemCount()
+    std::size_t GetQueueMaxElemCount() const
     {
         return 2;
     }
-    static std::size_t GetQueueMaxByteSize()
+    std::size_t GetQueueMaxByteSize() const
     {
         return 1000;
     }
 };
 
-typedef net::details::PersistentQueue<net::CrtAllocator, net::DefaultSettings> DefaultQueue;
+typedef net::details::PersistentQueue<net::DefaultSettings> DefaultQueue;
 class QueueDefaultCallback
 {
 public:
-    MOCK_METHOD1(Handle, void(const DefaultQueue::MemHolder& h));
+    MOCK_METHOD1(Handle, void(const net::MemHolder& h));
 };
 
-typedef net::details::PersistentQueue<net::CrtAllocator, SettingsWithSmallLimits> SmallQueue;
+typedef net::details::PersistentQueue<SettingsWithSmallLimits> SmallQueue;
 class SmallQueueCallback
 {
 public:
-    MOCK_METHOD1(Handle, void(const SmallQueue::MemHolder& h));
+    MOCK_METHOD1(Handle, void(const net::MemHolder& h));
 };
 
 TEST(Queue, PushFirstImmediately)
 {
-    net::CrtAllocator allocator;
-
     QueueDefaultCallback cb;
-    DefaultQueue queue(boost::bind(&QueueDefaultCallback::Handle, &cb, _1));
+    const auto func = boost::bind(&QueueDefaultCallback::Handle, &cb, _1);
+    DefaultQueue queue;
 
     EXPECT_CALL(cb, Handle(_)).Times(Exactly(1));
 
-    const auto mem = allocator.Allocate(1);
-    DefaultQueue::MemHolder holder {mem, 1};
-    queue.Push(std::move(holder));
+    const auto mem = boost::make_shared_noinit<char[]>(1);
+    net::MemHolder holder {mem, 1};
+    queue.Push(std::move(holder), func);
 
     ASSERT_FALSE(queue.IsEmpty());
 }
 
 TEST(Queue, PushAnotherAfterPop)
 {
-    net::CrtAllocator allocator;
-
     QueueDefaultCallback cb;
-    DefaultQueue queue(boost::bind(&QueueDefaultCallback::Handle, &cb, _1));
+    const auto func = boost::bind(&QueueDefaultCallback::Handle, &cb, _1);
+    DefaultQueue queue;
 
     EXPECT_CALL(cb, Handle(_)).Times(Exactly(2));
 
-    const auto mem = allocator.Allocate(1);
-    DefaultQueue::MemHolder holder {mem, 1};
-    queue.Push(std::move(holder));
-    queue.Push(std::move(holder));
+    const auto mem = boost::make_shared_noinit<char[]>(1);
+    net::MemHolder holder {mem, 1};
+    queue.Push(std::move(holder), func);
+    queue.Push(std::move(holder), func);
 
-    queue.Pop();
+    queue.Pop(func);
 
     ASSERT_FALSE(queue.IsEmpty());
-    queue.Pop();
+    queue.Pop(func);
     ASSERT_TRUE(queue.IsEmpty());
 }
 
 TEST(Queue, Persist)
 {
-    net::CrtAllocator allocator;
-
     SmallQueueCallback cb;
-    SmallQueue queue(boost::bind(&SmallQueueCallback::Handle, &cb, _1));
+    SmallQueue queue;
+    const auto func = boost::bind(&SmallQueueCallback::Handle, &cb, _1);
 
     EXPECT_CALL(cb, Handle(_)).Times(Exactly(3));
 
     for (int i = 0; i < 3; ++i)
     {
-        const auto mem = allocator.Allocate(1);
-        SmallQueue::MemHolder holder {mem, 1};
-        queue.Push(std::move(holder));
+        const auto mem = boost::make_shared_noinit<char[]>(1);
+        net::MemHolder holder {mem, 1};
+        queue.Push(std::move(holder), func);
     }
 
     for (int i = 0; i < 3; ++i)
-        queue.Pop();
+        queue.Pop(func);
 
     ASSERT_TRUE(queue.IsEmpty());
 }

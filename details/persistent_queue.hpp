@@ -2,15 +2,15 @@
 
 #include "net/exception.hpp"
 #include "net/settings.hpp"
+#include "net/details/params.hpp"
 
 #include <deque>
 
 #include <boost/thread/mutex.hpp>
-#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/function.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/make_shared.hpp>
 
 namespace net
 {
@@ -19,22 +19,20 @@ namespace details
 
 template
 <
-        typename Allocator,
-        typename Settings = DefaultSettings
+    typename Settings = DefaultSettings
 >
 class PersistentQueue
 {
 public:
     typedef boost::shared_ptr<PersistentQueue> Ptr;
-    typedef typename Allocator::MemHolder MemHolder;
-    typedef boost::function<void(const MemHolder&)> Callback;
 
-    PersistentQueue(const Callback& cb)
-        : m_Callback(cb)
-        , m_ByteSize()
+    template<typename ... Args>
+    PersistentQueue(Args... args)
+        : m_ByteSize()
         , m_ReadOffset()
         , m_CurrentPacket()
         , m_CurrentSize()
+        , m_Settings(hlp::Param<Settings>::Unpack(args...))
     {
 
     }
@@ -56,7 +54,8 @@ public:
         ClearData();
     }
 
-    void Push(MemHolder&& holder)
+    template<typename Callback>
+    void Push(MemHolder&& holder, const Callback& cb)
     {
         boost::unique_lock<boost::mutex> lock(m_Mutex);
         m_ByteSize += holder.m_Size;
@@ -67,7 +66,7 @@ public:
             m_Queue.emplace_back(std::move(holder));
 
             // queue is not persistent yet
-            if (m_Queue.size() < Settings::GetQueueMaxElemCount() && m_ByteSize < Settings::GetQueueMaxByteSize())
+            if (m_Queue.size() < m_Settings.GetQueueMaxElemCount() && m_ByteSize < m_Settings.GetQueueMaxByteSize())
             {
                 // store in memory queue
                 if (m_Queue.size() == 1)
@@ -75,7 +74,7 @@ public:
                     // first packet, need to invoke write
                     auto copy = m_Queue.front();
                     lock.unlock();
-                    m_Callback(copy);
+                    cb(copy);
                 }
             }
             else
@@ -115,7 +114,8 @@ public:
         }
     }
 
-    void Pop()
+    template<typename Callback>
+    void Pop(const Callback& cb)
     {
         boost::unique_lock<boost::mutex> lock(m_Mutex);
 
@@ -135,7 +135,7 @@ public:
                 lock.unlock();
 
                 // write next packet
-                m_Callback(next);
+                cb(next);
             }
         }
         else
@@ -161,7 +161,7 @@ public:
             if (m_CurrentSize < m_CurrentPacket.m_Size)
             {
                 // not enough memory, allocate new buffer
-                m_CurrentPacket.m_Memory = Allocator::Allocate(m_CurrentPacket.m_Size);
+                m_CurrentPacket.m_Memory = boost::make_shared_noinit<char[]>(m_CurrentPacket.m_Size);
                 m_CurrentSize = m_CurrentPacket.m_Size;
             }
 
@@ -172,7 +172,7 @@ public:
             lock.unlock();
 
             // write packet
-            m_Callback(m_CurrentPacket);
+            cb(m_CurrentPacket);
         }
     }
 
@@ -200,9 +200,10 @@ private:
     }
 
 private:
+    const Settings& m_Settings;
+
     boost::filesystem::fstream m_Stream;
     boost::filesystem::path m_FilePath;
-    const Callback m_Callback;
     unsigned m_ByteSize;
     std::streampos m_ReadOffset;
 
