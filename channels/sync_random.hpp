@@ -1,6 +1,7 @@
 #pragma once
 
 #include "net/details/channel_base.hpp"
+#include "net/details/params.hpp"
 
 namespace net
 {
@@ -10,20 +11,20 @@ namespace channels
 //! Channel type
 template<typename Owner>
 class SyncRandom : public net::details::Channel<typename Owner::Handle,
-                                                typename Owner::Allocator,
                                                 typename Owner::Queue,
                                                 typename Owner::Settings>
 {
 public:
     typedef details::Channel<typename Owner::Handle,
-                             typename Owner::Allocator,
                              typename Owner::Queue,
                              typename Owner::Settings> Base;
     typedef boost::weak_ptr<Owner> OwnerPtr;
 
-    SyncRandom(boost::asio::io_service& svc, const OwnerPtr& owner, const typename Owner::Handle& handle)
-        : Base(svc, handle)
-        , m_Owner(owner)
+
+    template<typename ... Args>
+    SyncRandom(Args... args)
+        : Base(args...)
+        , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
         , m_WriteOffset()
         , m_ReadOffset()
     {
@@ -59,7 +60,7 @@ public:
         LOG_INFO("Connection closed, bytes: %s, error: (%s) %s", bytes, e.value(), e.message());
         if (const auto owner = m_Owner.lock())
             owner->ConnectionClosed(Base::shared_from_this(), e);
-        m_Callback(IConnection<typename Owner::Allocator>::StreamPtr());
+        this->m_Callback(IConnection::StreamPtr());
     }
 
     virtual void OnBytesRead(const std::size_t bytes) override

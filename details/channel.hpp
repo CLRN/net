@@ -2,6 +2,7 @@
 
 #include "stream.hpp"
 #include "channel_base.hpp"
+#include "params.hpp"
 
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
@@ -20,32 +21,31 @@ namespace details
 //! Pipe/file channel abstraction
 template
 <
-        typename Handle,
-        typename Allocator,
-        typename Queue,
-        typename Settings
+    typename Handle,
+    typename Queue,
+    typename Settings
 >
 class Channel 
-    : public boost::enable_shared_from_this<Channel<Handle, Allocator, Queue, Settings> >
-    , public BaseChannel<Handle, Allocator, Queue>
+    : public boost::enable_shared_from_this<Channel<Handle, Queue, Settings> >
+    , public BaseChannel<Handle, Queue>
 {
-    typedef typename Allocator::Memory Memory;
-    typedef typename IConnection<Allocator>::Callback Callback;
-    typedef typename Allocator::MemHolder MemHolder;
-    typedef BaseChannel<Handle, Allocator, Queue> Base;
+    typedef BaseChannel<Handle, Queue> Base;
 
 public:
-    typedef boost::shared_ptr<Channel<Handle, Allocator, Queue, Settings>> Ptr;
+    typedef boost::shared_ptr<Channel<Handle, Queue, Settings>> Ptr;
 
 protected:
-    Channel(boost::asio::io_service& svc, const Handle& h)
-        : Base(h)
-        , m_Service(svc)
-        , m_Strand(svc)
+
+    template<typename ... Args>
+    Channel(Args... args)
+        : Base(hlp::Param<Handle>::Unpack(args...))
+        , m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
+        , m_Strand(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_MessageSize()
         , m_ReadBytes()
         , m_ParsedBytes()
-        , m_Queue(boost::bind(&Base::Write, this, _1))
+        , m_Queue(args...)
+        , m_Settings(hlp::Param<Settings>::Unpack(args...))
     {
 
     }
@@ -75,7 +75,7 @@ protected:
     {
         MemHolder holder = 
         { 
-            typename Allocator::Memory(data.get() - sizeof(boost::uint32_t), [data](char*){}), 
+            Memory(data.get() - sizeof(boost::uint32_t), [data](char*){}),
             size + sizeof(boost::uint32_t) 
         };
 
@@ -83,18 +83,18 @@ protected:
         m_Queue.Push(std::move(holder));
     }
 
-    virtual void Receive(const Callback& callback) override
+    virtual void Receive(const IConnection::Callback& callback) override
     {
         m_Callback = callback;
         PrepareBuffer();
-        const auto bufferSize = Settings::GetBufferSize();
+        const auto bufferSize = m_Settings.GetBufferSize();
         this->Read(boost::asio::buffer(&m_ReadBuffer[m_ReadBytes], bufferSize - m_ReadBytes));
     }
 
     virtual Memory Prepare(std::size_t size) override
     {
-        const auto mem = Allocator::Allocate(size + sizeof(boost::uint32_t));
-        return typename Allocator::Memory(mem.get() + sizeof(boost::uint32_t), [mem](char*){});
+        const auto mem = boost::make_shared_noinit<char[]>(size + sizeof(boost::uint32_t));
+        return Memory(mem.get() + sizeof(boost::uint32_t), [mem](char*){});
     }
 
     void WriteCallback(const boost::system::error_code& e, const std::size_t bytes, MemHolder)
@@ -141,7 +141,7 @@ private:
     {
         if (!m_ReadBuffer)
         {
-            m_ReadBuffer = Allocator::Allocate(m_BufferSize);
+            m_ReadBuffer = boost::make_shared_noinit<char[]>(m_BufferSize);
             return;
         }
 
@@ -158,7 +158,7 @@ private:
 
         // copy remaining not parsed data to new buffer
         m_BufferSize = std::max(Settings::GetBufferSize(), m_MessageSize + sizeof(boost::uint32_t));
-        auto buffer = Allocator::Allocate(m_BufferSize);
+        auto buffer = boost::make_shared_noinit<char[]>(m_BufferSize);
         memcpy(buffer.get(), &m_ReadBuffer[m_ParsedBytes], remainingBytes);
 
         m_ReadBuffer.swap(buffer);
@@ -214,12 +214,12 @@ private:
             class StreamWithMemory : public boost::iostreams::stream<net::BinaryReadStream>
             {
             public:
-                StreamWithMemory(const char* data, std::size_t size, const typename Allocator::Memory& mem) 
+                StreamWithMemory(const char* data, std::size_t size, const Memory& mem)
                     : boost::iostreams::stream<net::BinaryReadStream>(data, size)
                     , m_Memory(mem)
                 {}
             private:
-                const typename Allocator::Memory m_Memory;
+                const Memory m_Memory;
             };
 
             const auto stream = boost::make_shared<StreamWithMemory>(data, m_MessageSize, m_ReadBuffer);
@@ -239,7 +239,7 @@ private:
     {
     }
 protected:
-    typename IConnection<Allocator>::Callback m_Callback;
+    IConnection::Callback m_Callback;
 
 private:
     boost::asio::io_service& m_Service;
@@ -249,8 +249,9 @@ private:
     boost::uint32_t m_ParsedBytes;
     mutable boost::mutex m_Mutex;
     boost::asio::io_service::strand m_Strand;
-    typename Allocator::Memory m_ReadBuffer;
+    Memory m_ReadBuffer;
     Queue m_Queue;
+    Settings m_Settings;
 };	
 
 } // namespace details

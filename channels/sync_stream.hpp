@@ -1,6 +1,7 @@
 #pragma once
 
 #include "net/details/channel_base.hpp"
+#include "net/details/params.hpp"
 
 namespace net
 {
@@ -12,21 +13,19 @@ SET_LOGGING_MODULE("net");
 //! Channel type
 template<typename Owner>
 class SyncStream : public net::details::Channel<typename Owner::Handle,
-                                                typename Owner::Allocator,
                                                 typename Owner::Queue,
                                                 typename Owner::Settings>
 {
 public:
-    typedef typename Owner::Allocator::MemHolder MemHolder;
     typedef details::Channel<typename Owner::Handle,
-                             typename Owner::Allocator,
                              typename Owner::Queue,
                              typename Owner::Settings> Base;
     typedef boost::weak_ptr<Owner> OwnerPtr;
 
-    SyncStream(boost::asio::io_service& svc, const OwnerPtr& owner, const typename Owner::Handle& handle)
-        : Base(svc, handle)
-        , m_Owner(owner)
+    template<typename ... Args>
+    SyncStream(Args... args)
+        : Base(args...)
+        , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
     {
     }
 
@@ -68,7 +67,7 @@ public:
             LOG_INFO("Connection closed, bytes: %s, error: (%s) %s", bytes, e.value(), e.message());
             owner->ConnectionClosed(Base::shared_from_this(), e);
         }
-        Base::m_Callback(typename IConnection<typename Owner::Allocator>::StreamPtr());
+        Base::m_Callback(IConnection::StreamPtr());
     }
 
     typename Owner::Handle GetSocket() const

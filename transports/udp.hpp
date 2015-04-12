@@ -3,7 +3,7 @@
 #include "conversion/cast.h"
 #include "log/log.h"
 
-#include "net/details/persistent_queue.hpp"
+#include "net/details/params.hpp"
 #include "net/details/channel_base.hpp"
 #include "net/details/channel.hpp"
 #include "net/exception.hpp"
@@ -24,26 +24,27 @@ namespace udp
 
 template
 <
-    template<typename> class Channel, 
-    typename A = CrtAllocator,
-    typename S = DefaultSettings
+    template<typename> class Channel,
+    template<typename> class QueueImpl,
+    typename SettingsImpl = DefaultSettings
 >
-class Transport : public boost::enable_shared_from_this<Transport<Channel, A, S>>
+class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, SettingsImpl>>
 {
     typedef boost::asio::ip::udp::socket Socket;
-    typedef boost::enable_shared_from_this<Transport<Channel, A, S>> Shared;
+    typedef boost::enable_shared_from_this<Transport<Channel, QueueImpl, SettingsImpl>> Shared;
 
 public:
-    typedef A Allocator;
-    typedef S Settings;
-    typedef details::PersistentQueue<Allocator, Settings> Queue;
+    typedef SettingsImpl Settings;
+    typedef QueueImpl<Settings> Queue;
     typedef boost::shared_ptr<Socket> Handle;
     typedef std::string Endpoint;
     typedef Channel<Transport> ChannelImpl;
-    typedef boost::function<void(const typename ChannelImpl::Ptr& connection, const boost::system::error_code& e)> Callback;
+    typedef boost::function<void(const typename ChannelImpl::Ptr& connection,
+                                 const boost::system::error_code& e)> Callback;
 
-    Transport(boost::asio::io_service& svc)
-		: m_Service(svc)
+    template<typename ... Args>
+    Transport(Args... args)
+		: m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
 	{
 	}
 
@@ -52,7 +53,8 @@ public:
         Close();
 	}
 
-    void Receive(const Endpoint& endpoint, const Callback& callback)
+    template<typename T>
+    void Receive(const Endpoint& endpoint, const T& callback)
     {
         m_ClientConnectedCallback = callback;
 
@@ -85,7 +87,7 @@ public:
             m_Sockets.erase(it);
     }
 
-    typename IConnection<Allocator>::Ptr Connect(const std::string& endpoint)
+    IConnection::Ptr Connect(const std::string& endpoint)
     {
         const auto socket = boost::make_shared<Socket>(m_Service, boost::asio::ip::udp::v4());
         

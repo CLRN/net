@@ -24,8 +24,6 @@ template
 class PersistentQueue
 {
 public:
-    typedef boost::shared_ptr<PersistentQueue> Ptr;
-
     template<typename ... Args>
     PersistentQueue(Args... args)
         : m_ByteSize()
@@ -66,7 +64,8 @@ public:
             m_Queue.emplace_back(std::move(holder));
 
             // queue is not persistent yet
-            if (m_Queue.size() < m_Settings.GetQueueMaxElemCount() && m_ByteSize < m_Settings.GetQueueMaxByteSize())
+            if (m_Queue.size() < m_Settings.GetQueueMaxElemCount() &&
+                    m_ByteSize < m_Settings.GetQueueMaxByteSize())
             {
                 // store in memory queue
                 if (m_Queue.size() == 1)

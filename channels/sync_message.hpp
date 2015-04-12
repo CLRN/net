@@ -1,6 +1,7 @@
 #pragma once
 
 #include "net/details/channel_base.hpp"
+#include "net/details/params.hpp"
 
 namespace net
 {
@@ -10,25 +11,20 @@ namespace channels
 //! Channel type
 template<typename Owner>
 class SyncMessage : public net::details::Channel<typename Owner::Handle,
-                                                 typename Owner::Allocator,
                                                  typename Owner::Queue,
                                                  typename Owner::Settings>
 {
 public:
-    typedef typename Owner::Allocator::MemHolder MemHolder;
     typedef details::Channel<typename Owner::Handle,
-                             typename Owner::Allocator,
                              typename Owner::Queue,
                              typename Owner::Settings> Base;
     typedef boost::weak_ptr<Owner> OwnerPtr;
 
-    SyncMessage(boost::asio::io_service& svc,
-                const boost::asio::ip::udp::endpoint& ep,
-                const OwnerPtr& owner,
-                const typename Owner::Handle& handle)
-        : Base(svc, handle)
-        , m_Owner(owner)
-        , m_Endpoint(ep)
+    template<typename ... Args>
+    SyncMessage(Args... args)
+        : Base(args...)
+        , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
+        , m_Endpoint(hlp::Param<boost::asio::ip::udp::endpoint>::Unpack(args...))
     {
     }
 
@@ -60,7 +56,7 @@ public:
             LOG_INFO("Connection closed, bytes: %s, error: (%s) %s", bytes, e.value(), e.message());
             owner->ConnectionClosed(Base::shared_from_this(), e);
         }
-        Base::m_Callback(typename IConnection<typename Owner::Allocator>::StreamPtr());
+        Base::m_Callback(IConnection::StreamPtr());
     }
 
     typename Owner::Handle GetSocket() const

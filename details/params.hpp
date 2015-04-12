@@ -17,7 +17,7 @@ struct Param
     {
         return Unpack(args...);
     }
-
+/*
     static const T& Unpack()
     {
         static const T def = {};
@@ -35,7 +35,7 @@ struct Param
     {
         return Unpack(args...);
     }
-
+*/
 };
 
 } // namespace hlp

@@ -2,6 +2,7 @@
 
 #include "connection.hpp"
 #include "settings.hpp"
+#include "details/persistent_queue.hpp"
 
 #include <boost/asio/io_service.hpp>
 
@@ -10,28 +11,30 @@ namespace net
 
 template
 <
-    template<template<typename> class, typename, typename> class TransportImpl,
+    template<
+        template<typename> class Channel,
+        template<typename> class Queue,
+        typename> class TransportImpl,
     template<typename> class Channel,
-    typename Settings = DefaultSettings,
-    typename A = CrtAllocator
+    template<typename> class Queue = details::PersistentQueue,
+    typename Settings = DefaultSettings
 >
 class Transport
 {
 public:
-    typedef A Allocator;
-    typedef TransportImpl<Channel, Allocator, Settings> Impl;
+    typedef TransportImpl<Channel, Queue, Settings> Impl;
     typedef typename Impl::Endpoint Endpoint;
-    typedef IConnection<Allocator> Connection;
-    typedef typename Connection::StreamPtr Stream;
+    typedef IConnection::StreamPtr Stream;
 
-    Transport(boost::asio::io_service& svc)
-        : m_Impl(boost::make_shared<Impl>(svc))
+    template<typename ...Args>
+    Transport(Args... args)
+        : m_Impl(boost::make_shared<Impl>(args...))
     {
 
     }
 
     //! Connect to remote host
-    typename Connection::Ptr Connect(const Endpoint& endpoint)
+    IConnection::Ptr Connect(const Endpoint& endpoint)
     {
         return m_Impl->Connect(endpoint);
     }

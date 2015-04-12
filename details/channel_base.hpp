@@ -12,12 +12,11 @@ namespace details
 {
 
 //! Channel members holder
-template<typename Handle, typename Allocator, typename Queue>
-class BaseChannel : public IConnection<Allocator>
+template<typename Handle, typename Queue>
+class BaseChannel : public IConnection
 {
 public:
     typedef boost::asio::mutable_buffers_1 Buffer;
-    typedef typename Allocator::MemHolder MemHolder;
 
     virtual void Read(const Buffer& buffer) = 0;
     virtual void Write(const MemHolder& holder) = 0;
