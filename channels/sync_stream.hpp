@@ -23,7 +23,7 @@ public:
     typedef boost::weak_ptr<Owner> OwnerPtr;
 
     template<typename ... Args>
-    SyncStream(Args... args)
+    SyncStream(const Args&... args)
         : Base(args...)
         , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
     {

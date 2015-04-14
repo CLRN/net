@@ -45,7 +45,7 @@ public:
                                  const boost::system::error_code& e)> Callback;
 
     template<typename ... Args>
-    Transport(Args... args)
+    Transport(const Args&... args)
         : m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_Acceptor(hlp::Param<boost::asio::io_service>::Unpack(args...))
 	{
@@ -104,10 +104,7 @@ public:
     {
         const auto socket = boost::make_shared<Socket>(m_Service);
         socket->connect(ParseEP(endpoint));
-
-        ChannelImpl c(m_Service, Shared::shared_from_this(), socket);
-
-        return boost::make_shared<ChannelImpl>(m_Service, Shared::shared_from_this(), socket);
+        return boost::make_shared<ChannelImpl>(std::ref(m_Service), Shared::shared_from_this(), socket);
     }
 
     void Close()

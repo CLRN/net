@@ -37,7 +37,7 @@ public:
 protected:
 
     template<typename ... Args>
-    Channel(Args... args)
+    Channel(const Args&... args)
         : Base(hlp::Param<Handle>::Unpack(args...))
         , m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_Strand(hlp::Param<boost::asio::io_service>::Unpack(args...))
@@ -80,7 +80,7 @@ protected:
         };
 
         reinterpret_cast<boost::uint32_t&>(*holder.m_Memory.get()) = size;
-        m_Queue.Push(std::move(holder));
+        m_Queue.Push(std::move(holder), boost::bind(&Base::Write, this, _1));
     }
 
     virtual void Receive(const IConnection::Callback& callback) override
@@ -106,7 +106,7 @@ protected:
         }
         else
         {
-            m_Queue.Pop();
+            m_Queue.Pop(boost::bind(&Base::Write, this, _1));
         }
     }
 
@@ -157,7 +157,7 @@ private:
         const auto remainingBytes = m_ReadBytes - m_ParsedBytes;
 
         // copy remaining not parsed data to new buffer
-        m_BufferSize = std::max(Settings::GetBufferSize(), m_MessageSize + sizeof(boost::uint32_t));
+        m_BufferSize = std::max(m_Settings.GetBufferSize(), m_MessageSize + sizeof(boost::uint32_t));
         auto buffer = boost::make_shared_noinit<char[]>(m_BufferSize);
         memcpy(buffer.get(), &m_ReadBuffer[m_ParsedBytes], remainingBytes);
 
@@ -183,7 +183,7 @@ private:
             // obtain current message size
             const char* currentMessageBegin = &m_ReadBuffer[m_ParsedBytes];
             m_MessageSize = reinterpret_cast<const boost::uint32_t&>(*currentMessageBegin);
-            if (m_MessageSize > Settings::GetMaxMessageSize()) // check size limit
+            if (m_MessageSize > m_Settings.GetMaxMessageSize()) // check size limit
             {
                 // failed to read, probably connection is broken or client disconnected
                 if (!e)
@@ -251,7 +251,7 @@ private:
     boost::asio::io_service::strand m_Strand;
     Memory m_ReadBuffer;
     Queue m_Queue;
-    Settings m_Settings;
+    const Settings& m_Settings;
 };	
 
 } // namespace details

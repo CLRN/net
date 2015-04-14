@@ -21,7 +21,7 @@ public:
     typedef boost::weak_ptr<Owner> OwnerPtr;
 
     template<typename ... Args>
-    SyncMessage(Args... args)
+    SyncMessage(const Args&... args)
         : Base(args...)
         , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
         , m_Endpoint(hlp::Param<boost::asio::ip::udp::endpoint>::Unpack(args...))

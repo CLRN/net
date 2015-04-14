@@ -25,7 +25,7 @@ class PersistentQueue
 {
 public:
     template<typename ... Args>
-    PersistentQueue(Args... args)
+    PersistentQueue(const Args... args)
         : m_ByteSize()
         , m_ReadOffset()
         , m_CurrentPacket()

@@ -27,7 +27,7 @@ public:
     typedef IConnection::StreamPtr Stream;
 
     template<typename ...Args>
-    Transport(Args... args)
+    Transport(const Args&... args)
         : m_Impl(boost::make_shared<Impl>(args...))
     {
 

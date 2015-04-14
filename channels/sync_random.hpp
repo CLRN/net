@@ -22,7 +22,7 @@ public:
 
 
     template<typename ... Args>
-    SyncRandom(Args... args)
+    SyncRandom(const Args&... args)
         : Base(args...)
         , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
         , m_WriteOffset()

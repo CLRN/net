@@ -43,7 +43,7 @@ public:
                                  const boost::system::error_code& e)> Callback;
 
     template<typename ... Args>
-    Transport(Args... args)
+    Transport(const Args&... args)
 		: m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
 	{
 	}
@@ -66,7 +66,7 @@ public:
             m_Sockets.push_back(socket);
         }
 
-        const auto connection = boost::make_shared<Channel>(m_Service, ep, Shared::shared_from_this(), socket);
+        const auto connection = boost::make_shared<Channel>(std::ref(m_Service), ep, Shared::shared_from_this(), socket);
         m_ClientConnectedCallback(connection, boost::system::error_code());
     }
 
@@ -92,7 +92,7 @@ public:
         const auto socket = boost::make_shared<Socket>(m_Service, boost::asio::ip::udp::v4());
         
         const auto ep = ParseEP(endpoint);
-        return boost::make_shared<ChannelImpl>(m_Service, ep, Shared::shared_from_this(), socket);
+        return boost::make_shared<ChannelImpl>(std::ref(m_Service), ep, Shared::shared_from_this(), socket);
     }
 
     void Close()
