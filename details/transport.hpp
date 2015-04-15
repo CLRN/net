@@ -2,7 +2,7 @@
 
 #include "connection.hpp"
 #include "settings.hpp"
-#include "details/persistent_queue.hpp"
+#include "persistent_queue.hpp"
 
 #include <boost/asio/io_service.hpp>
 

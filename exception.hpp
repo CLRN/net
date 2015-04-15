@@ -10,7 +10,7 @@ namespace net
 struct Exception : public virtual boost::exception, std::runtime_error
 {
     template <typename ... T>
-    Exception(const std::string& text, const T... args)
+    Exception(const std::string& text, const T&... args)
             : std::runtime_error(logging::MessageFormatter(text, args...).GetText().c_str())
     {}
 };

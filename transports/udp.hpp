@@ -4,11 +4,8 @@
 #include "log/log.h"
 
 #include "net/details/params.hpp"
-#include "net/details/channel_base.hpp"
-#include "net/details/channel.hpp"
 #include "net/exception.hpp"
 #include "net/details/memory.hpp"
-#include "net/settings.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/algorithm/string/split.hpp>

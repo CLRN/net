@@ -1,5 +1,7 @@
 #pragma once
 
+#include "memory.hpp"
+
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/noncopyable.hpp>
@@ -8,7 +10,6 @@ namespace net
 {
 
 //! Remote host connection abstraction
-template<typename Allocator>
 class IConnection : boost::noncopyable
 {
 public:
@@ -24,10 +25,10 @@ public:
     typedef boost::function<void (const StreamPtr& stream)> Callback;
 
     //! Prepare data buffer
-    virtual typename Allocator::Memory Prepare(std::size_t size) = 0;
+    virtual Memory Prepare(std::size_t size) = 0;
 
     //! Send to remote host
-    virtual void Send(const typename Allocator::Memory& data, std::size_t size) = 0;
+    virtual void Send(const Memory& data, std::size_t size) = 0;
 
     //! Receive callback
     virtual void Receive(const Callback& callback) = 0;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "net/details/channel_base.hpp"
+#include "net/details/channel.hpp"
 #include "net/details/params.hpp"
 
 namespace net

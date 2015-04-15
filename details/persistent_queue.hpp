@@ -1,8 +1,8 @@
 #pragma once
 
 #include "net/exception.hpp"
-#include "net/settings.hpp"
 #include "net/details/params.hpp"
+#include "net/details/settings.hpp"
 
 #include <deque>
 

@@ -1,18 +1,15 @@
 #pragma once
 
 #include "conversion/cast.h"
-#include "log/log.h"
 
 #include "net/details/params.hpp"
-#include "net/details/channel_base.hpp"
-#include "net/details/channel.hpp"
 #include "net/exception.hpp"
 #include "net/details/memory.hpp"
-#include "net/settings.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
+#include <boost/range/algorithm.hpp>
 #include <boost/bind.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
