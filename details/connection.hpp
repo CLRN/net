@@ -38,6 +38,9 @@ public:
 
     //! Close connection
     virtual void Close() = 0;
+
+    //! Get connection information
+    virtual std::string GetInfo() = 0;
 };
 
 

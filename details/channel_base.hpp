@@ -20,7 +20,7 @@ public:
 
     virtual void Read(const Buffer& buffer) = 0;
     virtual void Write(const MemHolder& holder) = 0;
-    virtual void ConnectionClosed(const boost::system::error_code& e, std::size_t bytes) = 0;
+    virtual void ConnectionClosed() = 0;
 
     BaseChannel(const Handle& h) : m_IoObject(h)
     {

@@ -2,6 +2,7 @@
 
 #include "net/details/channel.hpp"
 #include "net/details/params.hpp"
+#include "net/exception.hpp"
 
 namespace net
 {
@@ -39,23 +40,29 @@ public:
 
     virtual void Write(const MemHolder& holder) override
     {
-        boost::system::error_code e;
-        const auto written = Base::m_IoObject->send_to(boost::asio::buffer(holder.m_Memory.get(), holder.m_Size),
-                                                       m_Endpoint);
-        if (written != holder.m_Size || e)
+        try
+        {
+            boost::system::error_code e;
+            const auto written = Base::m_IoObject->send_to(boost::asio::buffer(holder.m_Memory.get(), holder.m_Size),
+                                                           m_Endpoint, 0, e);
+            if (e)
+                BOOST_THROW_EXCEPTION(net::Disconnected("Connection error") << net::SysErrorInfo(e));
+            if (written != holder.m_Size)
+                BOOST_THROW_EXCEPTION(net::Disconnected("Failed to write data, written: %s, expected: %s",
+                                                        written,
+                                                        holder.m_Size));
+        }
+        catch (const std::exception&)
         {
             if (const auto o = m_Owner.lock())
-                o->ConnectionClosed(Base::shared_from_this(), e);
+                o->ConnectionClosed(Base::shared_from_this());
         }
     }
 
-    virtual void ConnectionClosed(const boost::system::error_code& e, std::size_t bytes) override
+    virtual void ConnectionClosed() override
     {
         if (const auto owner = m_Owner.lock())
-        {
-            LOG_INFO("Connection closed, bytes: %s, error: (%s) %s", bytes, e.value(), e.message());
-            owner->ConnectionClosed(Base::shared_from_this(), e);
-        }
+            owner->ConnectionClosed(Base::shared_from_this());
         Base::m_Callback(IConnection::StreamPtr());
     }
 

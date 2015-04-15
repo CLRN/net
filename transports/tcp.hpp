@@ -1,6 +1,7 @@
 #pragma once
 
 #include "conversion/cast.h"
+#include "log/log.h"
 
 #include "net/details/params.hpp"
 #include "net/exception.hpp"
@@ -19,8 +20,6 @@ namespace net
 namespace tcp
 {
 
-SET_LOGGING_MODULE("net");
-
 template
 <
     template<typename> class Channel,
@@ -32,6 +31,7 @@ class Transport : public boost::enable_shared_from_this<Transport<Channel, Queue
     typedef boost::asio::ip::tcp::socket Socket;
     typedef boost::enable_shared_from_this<Transport<Channel, QueueImpl, SettingsImpl>> Shared;
 
+
 public:
     typedef boost::shared_ptr<Socket> Handle;
     typedef SettingsImpl Settings;
@@ -39,7 +39,17 @@ public:
     typedef std::string Endpoint;
     typedef Channel<Transport> ChannelImpl;
     typedef boost::function<void(const typename ChannelImpl::Ptr& connection,
-                                 const boost::system::error_code& e)> Callback;
+                                 const boost::exception_ptr& e)> Callback;
+    class ChannelWithInfoGetter : public ChannelImpl
+    {
+    public:
+        template<typename ... Args>
+        ChannelWithInfoGetter(const Args&... args) : ChannelImpl(args...) {}
+        virtual std::string GetInfo() override
+        {
+            return boost::lexical_cast<std::string>(ChannelImpl::m_IoObject->remote_endpoint());
+        }
+    };
 
     template<typename ... Args>
     Transport(const Args&... args)
@@ -67,10 +77,10 @@ public:
         Accept();
     }
 
-    void ConnectionClosed(const typename ChannelImpl::Ptr& connection, const boost::system::error_code& e)
+    void ConnectionClosed(const typename ChannelImpl::Ptr& connection)
     {
         if (m_ClientConnectedCallback)
-            m_ClientConnectedCallback(connection, e);
+            m_ClientConnectedCallback(connection, boost::current_exception());
 
         boost::unique_lock<boost::mutex> lock(m_Mutex);
         const auto socket = static_cast<const ChannelImpl&>(*connection).GetSocket();
@@ -101,7 +111,7 @@ public:
     {
         const auto socket = boost::make_shared<Socket>(m_Service);
         socket->connect(ParseEP(endpoint));
-        return boost::make_shared<ChannelImpl>(std::ref(m_Service), Shared::shared_from_this(), socket);
+        return boost::make_shared<ChannelWithInfoGetter>(std::ref(m_Service), Shared::shared_from_this(), socket);
     }
 
     void Close()
@@ -142,12 +152,7 @@ private:
         Accept();
 
         if (e)
-        {
-            LOG_ERROR("Failed to accept new client: %s", e.message());
             return; // failed to accept client
-        }
-
-        LOG_INFO("New client accepted: %s", client->remote_endpoint());
 
 	     // construct new pipe instance
         const auto instance = boost::make_shared<ChannelImpl>(Shared::shared_from_this(), client);

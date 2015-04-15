@@ -15,6 +15,18 @@ struct Exception : public virtual boost::exception, std::runtime_error
     {}
 };
 
+struct Disconnected : public Exception
+{
+    template <typename ... T>
+    Disconnected(const T&... args) : Exception(args...) {}
+};
+
+struct UnableToConnect : public Exception
+{
+    template <typename ... T>
+    UnableToConnect(const T&... args) : Exception(args...) {}
+};
+
 typedef boost::error_info<struct endpoint_, std::string> EndpointInfo;
 typedef boost::error_info<struct sys_error_, boost::system::error_code> SysErrorInfo;
 

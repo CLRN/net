@@ -10,7 +10,7 @@ namespace channels
 
 //! Channel type
 template<typename Owner>
-class SyncStream : public net::details::Channel<typename Owner::Handle,
+class AsyncStream : public net::details::Channel<typename Owner::Handle,
                                                 typename Owner::Queue,
                                                 typename Owner::Settings>
 {
@@ -21,7 +21,7 @@ public:
     typedef boost::weak_ptr<Owner> OwnerPtr;
 
     template<typename ... Args>
-    SyncStream(const Args&... args)
+    AsyncStream(const Args&... args)
         : Base(args...)
         , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
     {
@@ -46,31 +46,22 @@ public:
 
     virtual void Write(const MemHolder& holder) override
     {
-        try
-        {
-            boost::system::error_code e;
-            const auto written = boost::asio::write(*Base::m_IoObject,
-                                                    boost::asio::buffer(holder.m_Memory.get(), holder.m_Size),
-                                                    boost::asio::transfer_all(),
-                                                    e);
-            if (e)
-                BOOST_THROW_EXCEPTION(net::Disconnected("Connection error") << net::SysErrorInfo(e));
-            if (written != holder.m_Size)
-                BOOST_THROW_EXCEPTION(net::Disconnected("Failed to write data, written: %s, expected: %s",
-                                                        written,
-                                                        holder.m_Size));
-        }
-        catch (const std::exception&)
-        {
-            if (const auto o = m_Owner.lock())
-                o->ConnectionClosed(Base::shared_from_this());
-        }
+        assert(*reinterpret_cast<const boost::uint32_t*>(holder.m_Memory.get()) ==
+               holder.m_Size - sizeof(boost::uint32_t));
+
+        boost::asio::async_write(
+                *Base::m_IoObject,
+                boost::asio::buffer(holder.m_Memory.get(), holder.m_Size),
+                boost::asio::transfer_exactly(holder.m_Size),
+                Base::m_Strand.wrap(boost::bind(&AsyncStream::WriteCallback, Base::shared_from_this(), _1, _2, holder))
+        );
     }
 
     virtual void ConnectionClosed() override
     {
         if (const auto owner = m_Owner.lock())
             owner->ConnectionClosed(Base::shared_from_this());
+
         Base::m_Callback(IConnection::StreamPtr());
     }
 

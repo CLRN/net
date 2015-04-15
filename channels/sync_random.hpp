@@ -57,7 +57,6 @@ public:
 
     virtual void ConnectionClosed(const boost::system::error_code& e, std::size_t bytes) override
     {
-        LOG_INFO("Connection closed, bytes: %s, error: (%s) %s", bytes, e.value(), e.message());
         if (const auto owner = m_Owner.lock())
             owner->ConnectionClosed(Base::shared_from_this(), e);
         this->m_Callback(IConnection::StreamPtr());

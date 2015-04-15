@@ -101,7 +101,15 @@ protected:
     {
         if (e)
         {
-            Base::ConnectionClosed(e, bytes);
+            try
+            {
+                BOOST_THROW_EXCEPTION(net::Disconnected("Write failed, bytes: %s", bytes) << net::SysErrorInfo(e));
+            }
+            catch (const std::exception&)
+            {
+                this->ConnectionClosed();
+            }
+
             m_Queue.Clear();
         }
         else
@@ -125,7 +133,14 @@ public:
 
         if (e)
         {
-            this->ConnectionClosed(e, bytes);
+            try
+            {
+                BOOST_THROW_EXCEPTION(net::Disconnected("Connection error") << net::SysErrorInfo(e));
+            }
+            catch (const net::Exception&)
+            {
+                this->ConnectionClosed();
+            }
         }
         else
         {
@@ -229,8 +244,7 @@ private:
         }
         catch (const std::exception&)
         {
-            this->ConnectionClosed(boost::system::error_code(boost::system::errc::protocol_error,
-                                                             boost::system::system_category()), 0);
+            this->ConnectionClosed();
         }
     }
 
@@ -240,6 +254,7 @@ private:
     }
 protected:
     IConnection::Callback m_Callback;
+    boost::asio::io_service::strand m_Strand;
 
 private:
     boost::asio::io_service& m_Service;
@@ -248,7 +263,6 @@ private:
     boost::uint32_t m_ReadBytes;
     boost::uint32_t m_ParsedBytes;
     mutable boost::mutex m_Mutex;
-    boost::asio::io_service::strand m_Strand;
     Memory m_ReadBuffer;
     Queue m_Queue;
     const Settings& m_Settings;
