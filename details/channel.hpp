@@ -45,7 +45,7 @@ protected:
         , m_ReadBytes()
         , m_ParsedBytes()
         , m_Queue(args...)
-        , m_Settings(hlp::Param<const Settings>::Unpack(args...))
+        , m_Settings(hlp::Param<const Settings>::Unpack(args..., Settings()))
     {
 
     }

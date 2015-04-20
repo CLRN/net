@@ -32,8 +32,8 @@ class Transport : public boost::enable_shared_from_this<Transport<Channel, Queue
     typedef boost::asio::ip::tcp::socket Socket;
     typedef boost::enable_shared_from_this<Transport<Channel, QueueImpl, SettingsImpl>> Shared;
 
-
 public:
+    typedef boost::shared_ptr<Transport> Ptr;
     typedef boost::shared_ptr<Socket> Handle;
     typedef SettingsImpl Settings;
     typedef QueueImpl<Settings> Queue;
@@ -41,6 +41,8 @@ public:
     typedef Channel<Transport> ChannelImpl;
     typedef boost::function<void(const typename ChannelImpl::Ptr& connection,
                                  const boost::exception_ptr& e)> Callback;
+
+private:
     class ChannelWithInfoGetter : public ChannelImpl
     {
     public:
@@ -52,11 +54,12 @@ public:
         }
     };
 
+public:
     template<typename ... Args>
     Transport(const Args&... args)
         : m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_Acceptor(hlp::Param<boost::asio::io_service>::Unpack(args...))
-        , m_Factory(boost::make_shared<details::ConcreteFactory<ChannelWithInfoGetter, Handle, Args...>>(args...))
+        , m_Factory(details::MakeFactory<ChannelWithInfoGetter, Handle, Ptr>(args...))
 	{
 	}
 
@@ -113,7 +116,7 @@ public:
     {
         const auto socket = boost::make_shared<Socket>(m_Service);
         socket->connect(ParseEP(endpoint));
-        return m_Factory->Create(socket);
+        return m_Factory->Create(socket, Shared::shared_from_this());
     }
 
     void Close()
@@ -159,7 +162,7 @@ private:
 
 	     // construct new pipe instance
         const auto socket = boost::make_shared<Socket>(m_Service);
-        const auto instance = m_Factory->Create(socket);
+        const auto instance = m_Factory->Create(socket, Shared::shared_from_this());
 		
 	     // invoke callback
 	     m_ClientConnectedCallback(instance, boost::exception_ptr());
@@ -171,7 +174,7 @@ private:
     Callback m_ClientConnectedCallback;
     std::vector<boost::weak_ptr<Socket>> m_Sockets;
     boost::mutex m_Mutex;
-    typename details::IFactory<ChannelWithInfoGetter, Handle>::Ptr m_Factory;
+    typename details::IFactory<ChannelWithInfoGetter, Handle, Ptr>::Ptr m_Factory;
 };
 
 } // namespace tcp

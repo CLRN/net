@@ -23,7 +23,7 @@ public:
     template<typename ... Args>
     AsyncStream(const Args&... args)
         : Base(args...)
-        , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
+        , m_Owner(hlp::Param<const boost::shared_ptr<Owner>>::Unpack(args...))
     {
     }
 

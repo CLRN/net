@@ -24,7 +24,7 @@ public:
     template<typename ... Args>
     SyncMessage(const Args&... args)
         : Base(args...)
-        , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
+        , m_Owner(hlp::Param<const boost::shared_ptr<Owner>>::Unpack(args...))
         , m_Endpoint(hlp::Param<boost::asio::ip::udp::endpoint>::Unpack(args...))
     {
     }

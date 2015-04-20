@@ -22,6 +22,6 @@ TEST(Packer, Refs)
 
 TEST(Packer, Default)
 {
-    EXPECT_EQ(hlp::Param<const int>::Unpack('a', "dsa"), 0);
-    EXPECT_EQ(hlp::Param<const std::string>::Unpack('a', "dsa"), "");
+    EXPECT_EQ(hlp::Param<const int>::Unpack('a', "dsa", 100), 1000);
+    EXPECT_EQ(hlp::Param<const std::string>::Unpack('a', "dsa", std::string("default")), "default");
 }
