@@ -52,6 +52,7 @@ public:
     template<typename ... Args>
     Transport(const Args&... args)
 		: m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
+        , m_Factory(boost::make_shared<details::ConcreteFactory<ChannelWithInfoGetter, Handle, Args...>>(args...))
 	{
 	}
 
@@ -73,7 +74,7 @@ public:
             m_Sockets.push_back(socket);
         }
 
-        const auto connection = boost::make_shared<Channel>(std::ref(m_Service), ep, Shared::shared_from_this(), socket);
+        const auto connection = m_Factory->Create(socket);
         m_ClientConnectedCallback(connection, boost::system::error_code());
     }
 
@@ -99,7 +100,8 @@ public:
         const auto socket = boost::make_shared<Socket>(m_Service, boost::asio::ip::udp::v4());
         
         const auto ep = ParseEP(endpoint);
-        return boost::make_shared<ChannelWithInfoGetter>(std::ref(m_Service), ep, Shared::shared_from_this(), socket);
+        socket->connect(ep);
+        return m_Factory->Create(socket);
     }
 
     void Close()
@@ -136,6 +138,7 @@ private:
     Callback m_ClientConnectedCallback;
     std::vector<boost::weak_ptr<Socket>> m_Sockets;
     boost::mutex m_Mutex;
+    typename details::IFactory<ChannelWithInfoGetter, Handle>::Ptr m_Factory;
 };
 
 } // namespace udp

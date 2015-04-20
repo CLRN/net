@@ -30,7 +30,7 @@ public:
         , m_ReadOffset()
         , m_CurrentPacket()
         , m_CurrentSize()
-        , m_Settings(hlp::Param<Settings>::Unpack(args...))
+        , m_Settings(hlp::Param<const Settings>::Unpack(args...))
     {
 
     }

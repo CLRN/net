@@ -23,7 +23,7 @@ public:
     template<typename ... Args>
     SyncStream(const Args&... args)
         : Base(args...)
-        , m_Owner(hlp::Param<OwnerPtr>::Unpack(args...))
+        , m_Owner(hlp::Param<const OwnerPtr>::Unpack(args...))
     {
     }
 

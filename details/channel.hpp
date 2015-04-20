@@ -38,14 +38,14 @@ protected:
 
     template<typename ... Args>
     Channel(const Args&... args)
-        : Base(hlp::Param<Handle>::Unpack(args...))
+        : Base(hlp::Param<const Handle>::Unpack(args...))
         , m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_Strand(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_MessageSize()
         , m_ReadBytes()
         , m_ParsedBytes()
         , m_Queue(args...)
-        , m_Settings(hlp::Param<Settings>::Unpack(args...))
+        , m_Settings(hlp::Param<const Settings>::Unpack(args...))
     {
 
     }

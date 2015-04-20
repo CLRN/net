@@ -6,6 +6,7 @@
 #include "net/details/params.hpp"
 #include "net/exception.hpp"
 #include "net/details/memory.hpp"
+#include "net/details/factory.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -55,6 +56,7 @@ public:
     Transport(const Args&... args)
         : m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_Acceptor(hlp::Param<boost::asio::io_service>::Unpack(args...))
+        , m_Factory(boost::make_shared<details::ConcreteFactory<ChannelWithInfoGetter, Handle, Args...>>(args...))
 	{
 	}
 
@@ -111,7 +113,7 @@ public:
     {
         const auto socket = boost::make_shared<Socket>(m_Service);
         socket->connect(ParseEP(endpoint));
-        return boost::make_shared<ChannelWithInfoGetter>(std::ref(m_Service), Shared::shared_from_this(), socket);
+        return m_Factory->Create(socket);
     }
 
     void Close()
@@ -142,7 +144,8 @@ private:
         if (parts.size() != 2)
             BOOST_THROW_EXCEPTION(Exception("Wrong endpoint") << EndpointInfo(endpoint));
 
-        return boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(parts.front()), conv::cast<short>(parts.back()));
+        return boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(parts.front()),
+                                              conv::cast<short>(parts.back()));
     }
 
 	//! Accept client handler
@@ -155,10 +158,11 @@ private:
             return; // failed to accept client
 
 	     // construct new pipe instance
-        const auto instance = boost::make_shared<ChannelImpl>(Shared::shared_from_this(), client);
+        const auto socket = boost::make_shared<Socket>(m_Service);
+        const auto instance = m_Factory->Create(socket);
 		
 	     // invoke callback
-	     m_ClientConnectedCallback(instance, e);
+	     m_ClientConnectedCallback(instance, boost::exception_ptr());
 	}
 
 private:
@@ -167,6 +171,7 @@ private:
     Callback m_ClientConnectedCallback;
     std::vector<boost::weak_ptr<Socket>> m_Sockets;
     boost::mutex m_Mutex;
+    typename details::IFactory<ChannelWithInfoGetter, Handle>::Ptr m_Factory;
 };
 
 } // namespace tcp
