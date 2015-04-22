@@ -25,7 +25,7 @@ class PersistentQueue
 {
 public:
     template<typename ... Args>
-    PersistentQueue(const Args... args)
+    PersistentQueue(const Args&... args)
         : m_ByteSize()
         , m_ReadOffset()
         , m_CurrentPacket()
@@ -199,7 +199,7 @@ private:
     }
 
 private:
-    const Settings& m_Settings;
+    const Settings m_Settings;
 
     boost::filesystem::fstream m_Stream;
     boost::filesystem::path m_FilePath;

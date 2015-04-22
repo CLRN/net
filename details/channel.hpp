@@ -265,7 +265,7 @@ private:
     mutable boost::mutex m_Mutex;
     Memory m_ReadBuffer;
     Queue m_Queue;
-    const Settings& m_Settings;
+    const Settings m_Settings;
 };	
 
 } // namespace details

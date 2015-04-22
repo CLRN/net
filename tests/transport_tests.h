@@ -25,7 +25,7 @@ TEST(TCPTransportSync, Echo)
     boost::asio::io_service svc;
     typedef net::Transport<net::tcp::Transport, net::channels::SyncStream> Transport;
 
-    Transport transport(std::ref(svc));
+    Transport transport(svc);
     transport.Receive("127.0.0.1:10000", [](const net::IConnection::Ptr& c, const boost::exception_ptr& e){
         c->Receive([c](const Transport::Stream& stream){
             if (!stream)

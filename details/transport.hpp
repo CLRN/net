@@ -1,6 +1,6 @@
 #pragma once
 
-#include "connection.hpp"
+#include "net/connection.hpp"
 #include "settings.hpp"
 #include "persistent_queue.hpp"
 
