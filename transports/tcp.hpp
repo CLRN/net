@@ -160,9 +160,8 @@ private:
         if (e)
             return; // failed to accept client
 
-	     // construct new pipe instance
-        const auto socket = boost::make_shared<Socket>(m_Service);
-        const auto instance = m_Factory->Create(socket, Shared::shared_from_this());
+	    // construct new channel instance
+        const auto instance = m_Factory->Create(client, Shared::shared_from_this());
 		
 	     // invoke callback
 	     m_ClientConnectedCallback(instance, boost::exception_ptr());

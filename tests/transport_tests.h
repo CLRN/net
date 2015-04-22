@@ -27,9 +27,19 @@ TEST(TCPTransportSync, Echo)
 
     Transport transport(svc);
     transport.Receive("127.0.0.1:10000", [](const net::IConnection::Ptr& c, const boost::exception_ptr& e){
+        if (e)
+        {
+            std::cout << boost::current_exception_diagnostic_information(true) << std::endl;
+            return;
+        }
+
         c->Receive([c](const Transport::Stream& stream){
             if (!stream)
+            {
+                std::cout << boost::current_exception_diagnostic_information(true) << std::endl;
                 return;
+            }
+
 
             CopyStream(*stream, *c);
         });

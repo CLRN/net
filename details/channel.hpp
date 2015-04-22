@@ -46,6 +46,7 @@ protected:
         , m_ParsedBytes()
         , m_Queue(args...)
         , m_Settings(hlp::Param<const Settings>::Unpack(args..., Settings()))
+        , m_BufferSize(m_Settings.GetBufferSize())
     {
 
     }
@@ -108,6 +109,7 @@ protected:
             catch (const std::exception&)
             {
                 this->ConnectionClosed();
+                Close();
             }
 
             m_Queue.Clear();
@@ -140,6 +142,7 @@ public:
             catch (const net::Exception&)
             {
                 this->ConnectionClosed();
+                Close();
             }
         }
         else
@@ -245,6 +248,7 @@ private:
         catch (const std::exception&)
         {
             this->ConnectionClosed();
+            Close();
         }
     }
 
@@ -258,15 +262,15 @@ protected:
 
 private:
     boost::asio::io_service& m_Service;
+    Queue m_Queue;
+    const Settings m_Settings;
     std::size_t m_BufferSize;
     std::size_t m_MessageSize;
     boost::uint32_t m_ReadBytes;
     boost::uint32_t m_ParsedBytes;
     mutable boost::mutex m_Mutex;
     Memory m_ReadBuffer;
-    Queue m_Queue;
-    const Settings m_Settings;
-};	
+};
 
 } // namespace details
 } // namespace net
