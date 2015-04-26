@@ -37,34 +37,21 @@ public:
     //! Begin asynchronous read to buffer
     virtual void Read(const typename Base::Buffer& buffer) override
     {
-        Base::m_IoObject->async_read_some(
-            buffer,
-            boost::bind(&Base::ReadMessageCallback, Base::shared_from_this(), _1, _2)
-        );   
+        boost::system::error_code e;
+        const auto bytes = Base::m_IoObject->read_some(buffer, e);
+        Base::m_IoObject->get_io_service().post(
+                boost::bind(&Base::ReadMessageCallback, Base::shared_from_this(), e, bytes));
     }
 
 
     virtual void Write(const MemHolder& holder) override
     {
-        try
-        {
-            boost::system::error_code e;
-            const auto written = boost::asio::write(*Base::m_IoObject,
-                                                    boost::asio::buffer(holder.m_Memory.get(), holder.m_Size),
-                                                    boost::asio::transfer_all(),
-                                                    e);
-            if (e)
-                BOOST_THROW_EXCEPTION(net::Disconnected("Connection error") << net::SysErrorInfo(e));
-            if (written != holder.m_Size)
-                BOOST_THROW_EXCEPTION(net::Disconnected("Failed to write data, written: %s, expected: %s",
-                                                        written,
-                                                        holder.m_Size));
-        }
-        catch (const std::exception&)
-        {
-            if (const auto o = m_Owner.lock())
-                o->ConnectionClosed(Base::shared_from_this());
-        }
+        boost::system::error_code e;
+        const auto written = boost::asio::write(*Base::m_IoObject,
+                                                boost::asio::buffer(holder.m_Memory.get(), holder.m_Size),
+                                                boost::asio::transfer_all(),
+                                                e);
+        Base::WriteCallback(e, written, holder);
     }
 
     virtual void ConnectionClosed() override

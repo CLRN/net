@@ -49,7 +49,7 @@ public:
     //! Stop all activity
     void Close()
     {
-        m_Impl.Close();
+        m_Impl->Close();
     }
 
 private:
