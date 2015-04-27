@@ -62,7 +62,8 @@ public:
         if (const auto owner = m_Owner.lock())
             owner->ConnectionClosed(Base::shared_from_this());
 
-        Base::m_Callback(IConnection::StreamPtr());
+        if (Base::m_Callback)
+            Base::m_Callback(IConnection::StreamPtr());
     }
 
     typename Owner::Handle GetSocket() const
