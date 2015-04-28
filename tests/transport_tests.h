@@ -32,6 +32,52 @@ std::size_t CopyStream(std::istream& is, net::IConnection& c)
     return size;
 }
 
+struct TestResult
+{
+    typedef std::vector<TestResult> List;
+
+
+    void Print() const
+    {
+        std::cout << "Test name: " << m_Name << std::endl;
+
+
+        std::cout
+        << "\t\tSend speed: " << m_ByteSendSpeed << " KBytes/sec, " << m_PacketSendSpeed << " Packets/sec" << std::endl;
+
+        std::cout
+        << "\t\tReceive speed: " << m_BytesSpeed << " KBytes/sec, " << m_PacketsSpeed << " Packets/sec" << std::endl;
+    }
+
+    std::string m_Name;
+    unsigned m_ByteSendSpeed;
+    unsigned m_PacketSendSpeed;
+    unsigned m_BytesSpeed;
+    unsigned m_PacketsSpeed;
+};
+
+struct ResultHolder
+{
+    ~ResultHolder()
+    {
+        for (const auto& r : m_Results)
+            r.Print();
+    }
+    static ResultHolder& Instance()
+    {
+        static ResultHolder instance;
+        return instance;
+    }
+
+    void Add(TestResult&& r)
+    {
+        m_Results.emplace_back(std::move(r));
+    }
+
+private:
+    TestResult::List m_Results;
+};
+
 template<typename Transport>
 class Server
 {
@@ -77,12 +123,14 @@ public:
         //std::cout << "copying: " << m_BytesReceived << std::endl;
     }
 
-    void Stat(unsigned ms)
+    unsigned GetBytesSpeed(unsigned ms) const
     {
-        std::cout
-        << "Server bytes received : " << m_BytesReceived << ", packets: " << m_PacketsReceived << std::endl
-        << "Server speed: " << m_BytesReceived / ms << " KBytes/sec, "
-        << m_PacketsReceived * 1000 / ms << " Packets/sec" <<  std::endl;
+        return m_BytesReceived / ms;
+    }
+
+    unsigned GetPacketSpeed(unsigned ms) const
+    {
+        return m_PacketsReceived * 1000 / ms;
     }
 
     void Stop()
@@ -113,7 +161,7 @@ public:
     {
         m_Connection = m_Transport.Connect(ep);
 
-        boost::thread(boost::bind(&Client::Send, this));
+        m_SendThread = boost::thread(boost::bind(&Client::Send, this));
         m_Connection->Receive(boost::bind(&Client::OnDataRead, this, _1));
     }
 
@@ -147,21 +195,31 @@ public:
         //std::cout << "receiving: " << m_BytesReceived << std::endl;
     }
 
-    void Stat(unsigned ms)
+    unsigned GetSendBytesSpeed(unsigned ms) const
     {
-        std::cout
-        << "Client sent: " << m_BytesSent << std::endl
-        << "Client received: " << m_BytesReceived << std::endl
-        << "Send speed: " << m_BytesSent / ms << " KBytes/sec"  << std::endl
-        << "Client speed: " << m_BytesReceived / ms << " KBytes/sec, "
-        << m_PacketsReceived * 1000 / ms << " Packets/sec" << std::endl
-        << "Client bytes received : " << m_BytesReceived << ", packets: " << m_PacketsReceived << std::endl;
+        return m_BytesSent / ms;
+    }
+
+    unsigned GetSendPacketSpeed(unsigned ms) const
+    {
+        return (m_BytesSent / m_PacketSize) * 1000 / ms;
+    }
+
+    unsigned GetRecvBytesSpeed(unsigned ms) const
+    {
+        return m_BytesReceived / ms;
+    }
+
+    unsigned GetRecvPacketSpeed(unsigned ms) const
+    {
+        return m_PacketsReceived * 1000 / ms;
     }
 
     void Stop()
     {
         if (m_Connection)
             m_Connection->Close();
+        m_SendThread.join();
     }
 
 private:
@@ -172,6 +230,7 @@ private:
     std::atomic<unsigned> m_BytesReceived;
     std::atomic<unsigned> m_PacketsReceived;
     unsigned m_PacketSize;
+    boost::thread m_SendThread;
 };
 
 template <typename T>
@@ -186,21 +245,22 @@ public:
     {
         const auto ep = "127.0.0.1:10000";
 
-        m_Server.reset(new Server<T>(m_Service, m_IsUsingEcho));
-        m_Client.reset(new Client<T>(m_Service, size));
+        boost::asio::io_service service;
+        m_Server.reset(new Server<T>(service, m_IsUsingEcho));
+        m_Client.reset(new Client<T>(service, size));
 
-        m_Work = boost::make_unique<boost::asio::io_service::work>(m_Service);
+        m_Work = boost::make_unique<boost::asio::io_service::work>(service);
         for (unsigned i = 0; i < boost::thread::hardware_concurrency() * 2; ++i)
-            m_Pool.create_thread(boost::bind(&boost::asio::io_service::run, &m_Service));
+            m_Pool.create_thread(boost::bind(&boost::asio::io_service::run, &service));
 
         m_Server->Start(ep);
-        m_Service.post(boost::bind(&Client<T>::Start, m_Client.get(), ep));
+        service.post(boost::bind(&Client<T>::Start, m_Client.get(), ep));
 
         const auto start = std::chrono::system_clock::now();
         boost::this_thread::sleep(boost::posix_time::seconds(seconds));
         const auto now = std::chrono::system_clock::now();
 
-        m_Service.stop();
+        service.stop();
         m_Work.reset();
 
         m_Server->Stop();
@@ -208,17 +268,23 @@ public:
         m_Pool.join_all();
 
         const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
-        std::cout << "Packet size: " << size << ", elapsed: " << ms.count() << std::endl;
+        const auto* const test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        TestResult r =
+        {
+            std::string(test_info->test_case_name()) + ":" + test_info->name(),
+            m_Client->GetSendBytesSpeed(ms.count()),
+            m_Client->GetSendPacketSpeed(ms.count()),
+            m_IsUsingEcho ? m_Client->GetRecvBytesSpeed(ms.count()) : m_Server->GetBytesSpeed(ms.count()),
+            m_IsUsingEcho ? m_Client->GetRecvPacketSpeed(ms.count()) : m_Server->GetPacketSpeed(ms.count()),
+        };
 
-        m_Server->Stat(ms.count());
-        m_Client->Stat(ms.count());
+        ResultHolder::Instance().Add(std::move(r));
     }
 
 protected:
     bool m_IsUsingEcho;
 
 private:
-    boost::asio::io_service m_Service;
     boost::thread_group m_Pool;
     std::unique_ptr<boost::asio::io_service::work> m_Work;
 
