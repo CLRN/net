@@ -38,11 +38,11 @@ public:
     typedef boost::function<void(const typename ChannelImpl::Ptr& connection,
                                  const boost::exception_ptr& e)> Callback;
 
-    class ChannelWithInfoGetter : public ChannelImpl
+    class UDPChannel : public ChannelImpl
     {
     public:
         template<typename ... Args>
-        ChannelWithInfoGetter(const Args&... args) : ChannelImpl(args...) {}
+        UDPChannel(const Args&... args) : ChannelImpl(args...) {}
         virtual std::string GetInfo() override
         {
             return boost::lexical_cast<std::string>(ChannelImpl::m_IoObject->remote_endpoint());
@@ -52,7 +52,7 @@ public:
     template<typename ... Args>
     Transport(const Args&... args)
 		: m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
-        , m_Factory(boost::make_shared<details::ConcreteFactory<ChannelWithInfoGetter, Handle, Args...>>(args...))
+        , m_Factory(boost::make_shared<details::ConcreteFactory<UDPChannel, Handle, Args...>>(args...))
 	{
 	}
 
@@ -138,7 +138,7 @@ private:
     Callback m_ClientConnectedCallback;
     std::vector<boost::weak_ptr<Socket>> m_Sockets;
     boost::mutex m_Mutex;
-    typename details::IFactory<ChannelWithInfoGetter, Handle>::Ptr m_Factory;
+    typename details::IFactory<UDPChannel, Handle>::Ptr m_Factory;
 };
 
 } // namespace udp

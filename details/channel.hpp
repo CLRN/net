@@ -4,7 +4,6 @@
 #include "channel_base.hpp"
 #include "params.hpp"
 
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
@@ -12,6 +11,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <boost/make_unique.hpp>
 
 namespace net
 {
@@ -19,26 +19,19 @@ namespace details
 {
 
 //! Pipe/file channel abstraction
-template
-<
-    typename Handle,
-    typename Queue,
-    typename Settings
->
-class Channel 
-    : public boost::enable_shared_from_this<Channel<Handle, Queue, Settings> >
-    , public BaseChannel<Handle, Queue>
+template<typename Traits>
+class Channel : public BaseChannel<Traits>
 {
-    typedef BaseChannel<Handle, Queue> Base;
-
+    typedef BaseChannel<Traits> Base;
+    typedef typename Traits::Settings Settings;
 public:
-    typedef boost::shared_ptr<Channel<Handle, Queue, Settings>> Ptr;
+    typedef boost::shared_ptr<Channel<Traits>> Ptr;
 
 protected:
 
     template<typename ... Args>
     Channel(const Args&... args)
-        : Base(hlp::Param<const Handle>::Unpack(args...))
+        : Base(args...)
         , m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_Strand(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_MessageSize()
@@ -55,6 +48,11 @@ protected:
     {
         Flush();
         Close();
+    }
+
+    Ptr Shared()
+    {
+        return boost::dynamic_pointer_cast<Channel>(Base::shared_from_this());
     }
 
     virtual void Close() override
@@ -86,7 +84,7 @@ protected:
 
     virtual void Receive(const IConnection::Callback& callback) override
     {
-        m_Callback = callback;
+        Base::m_Callback = callback;
         PrepareBuffer();
         const auto bufferSize = m_Settings.GetBufferSize();
         this->Read(boost::asio::buffer(&m_ReadBuffer[m_ReadBytes], bufferSize - m_ReadBytes));
@@ -125,7 +123,7 @@ public:
     void ReadMessageCallback(boost::system::error_code e, const std::size_t bytes)
     {
         // increment write offset
-        OnBytesRead(bytes);
+        Base::OnBytesRead(bytes);
 
         // commit received bytes to the input sequence
         m_ReadBytes += bytes;
@@ -240,10 +238,10 @@ private:
                 const Memory m_Memory;
             };
 
-            const auto stream = boost::make_shared<StreamWithMemory>(data, m_MessageSize, m_ReadBuffer);
+            auto stream = boost::make_unique<StreamWithMemory>(data, m_MessageSize, m_ReadBuffer);
 
             // invoke callback
-            m_Callback(stream);
+            Base::m_Callback(std::move(stream));
         }
         catch (const std::exception&)
         {
@@ -252,17 +250,12 @@ private:
         }
     }
 
-    //! Increment offset, method is virtual because some random access io objects must have access to bytes read
-    virtual void OnBytesRead(const std::size_t /*bytes*/)
-    {
-    }
 protected:
-    IConnection::Callback m_Callback;
     boost::asio::io_service::strand m_Strand;
 
 private:
     boost::asio::io_service& m_Service;
-    Queue m_Queue;
+    typename Traits::Queue m_Queue;
     const Settings m_Settings;
     std::size_t m_BufferSize;
     std::size_t m_MessageSize;

@@ -2,6 +2,11 @@
 # Yes, INIT_BIICODE_BLOCKS() is no longer necessary
 
 ADD_BIICODE_TARGETS()
+IF (UNIX)
+    # enable profiling
+    TARGET_COMPILE_OPTIONS(${BII_BLOCK_TARGET} INTERFACE "-pg")
+    TARGET_LINK_LIBRARIES(${BII_BLOCK_TARGET} INTERFACE "-pg")
+ENDIF(UNIX)
 
 # You can safely delete lines from here...
 

@@ -38,10 +38,10 @@ public:
         if (dir == std::ios::cur)
             m_Read += offset;
         else
-            if (dir == std::ios::beg)
-                m_Read = offset;
-            else
-                m_Read = m_Size - offset;
+        if (dir == std::ios::beg)
+            m_Read = offset;
+        else
+            m_Read = m_Size - offset;
 
         return m_Read;
     }

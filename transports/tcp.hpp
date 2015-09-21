@@ -7,6 +7,7 @@
 #include "net/exception.hpp"
 #include "net/details/memory.hpp"
 #include "net/details/factory.hpp"
+#include "net/channels/traits.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -25,32 +26,39 @@ template
 <
     template<typename> class Channel,
     template<typename> class QueueImpl,
-    typename SettingsImpl = DefaultSettings
+    typename Settings = DefaultSettings
 >
-class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, SettingsImpl>>
+class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, Settings>>
 {
     typedef boost::asio::ip::tcp::socket Socket;
-    typedef boost::enable_shared_from_this<Transport<Channel, QueueImpl, SettingsImpl>> Shared;
+    typedef boost::shared_ptr<Socket> Handle;
+    typedef QueueImpl<Settings> Queue;
+    typedef Transport <Channel, QueueImpl, Settings> ThisType;
+    typedef boost::enable_shared_from_this<ThisType> Shared;
+    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType> Traits;
 
 public:
     typedef boost::shared_ptr<Transport> Ptr;
-    typedef boost::shared_ptr<Socket> Handle;
-    typedef SettingsImpl Settings;
-    typedef QueueImpl<Settings> Queue;
-    typedef std::string Endpoint;
-    typedef Channel<Transport> ChannelImpl;
-    typedef boost::function<void(const typename ChannelImpl::Ptr& connection,
+    typedef Channel<Traits> ChannelImpl;
+    typedef boost::function<void(const IConnection::Ptr& connection,
                                  const boost::exception_ptr& e)> Callback;
 
 private:
-    class ChannelWithInfoGetter : public ChannelImpl
+    class TCPChannel : public ChannelImpl
     {
     public:
         template<typename ... Args>
-        ChannelWithInfoGetter(const Args&... args) : ChannelImpl(args...) {}
+        TCPChannel(const Args&... args) : ChannelImpl(args...) {}
         virtual std::string GetInfo() override
         {
             return boost::lexical_cast<std::string>(ChannelImpl::m_IoObject->remote_endpoint());
+        }
+
+        virtual void Close() override
+        {
+            boost::system::error_code e;
+            ChannelImpl::m_IoObject->shutdown(boost::asio::ip::tcp::socket::shutdown_both, e);
+            ChannelImpl::Close();
         }
     };
 
@@ -59,7 +67,7 @@ public:
     Transport(const Args&... args)
         : m_Service(hlp::Param<boost::asio::io_service>::Unpack(args...))
         , m_Acceptor(hlp::Param<boost::asio::io_service>::Unpack(args...))
-        , m_Factory(details::MakeFactory<ChannelWithInfoGetter, Handle, Ptr>(args...))
+        , m_Factory(details::MakeFactory<TCPChannel, Handle, Ptr>(args...))
 	{
 	}
 
@@ -68,8 +76,8 @@ public:
         Close();
 	}
 
-    template<typename T>
-    void Receive(const Endpoint& endpoint, const T& callback)
+    template<typename Endpoint, typename Callback>
+    void Receive(const Endpoint& endpoint, const Callback& callback)
     {
         m_ClientConnectedCallback = callback;
 
@@ -82,13 +90,13 @@ public:
         Accept();
     }
 
-    void ConnectionClosed(const typename ChannelImpl::Ptr& connection)
+    void ConnectionClosed(const IConnection::Ptr& connection)
     {
         if (m_ClientConnectedCallback)
             m_ClientConnectedCallback(connection, boost::current_exception());
 
         boost::unique_lock<boost::mutex> lock(m_Mutex);
-        const auto socket = static_cast<const ChannelImpl&>(*connection).GetSocket();
+        const auto socket = static_cast<const ChannelImpl&>(*connection).GetHandle();
         const auto it = boost::find_if(m_Sockets, [&socket](const boost::weak_ptr<Socket>& s){
             if (const auto locked = s.lock())
                 return locked == socket;
@@ -133,7 +141,10 @@ public:
         for (const auto& socket : copy)
         {
             if (const auto s = socket.lock())
+            {
+                s->shutdown(boost::asio::ip::tcp::socket::shutdown_both, e);
                 s->close(e);
+            }
         }
     }
 
@@ -173,7 +184,7 @@ private:
     Callback m_ClientConnectedCallback;
     std::vector<boost::weak_ptr<Socket>> m_Sockets;
     boost::mutex m_Mutex;
-    typename details::IFactory<ChannelWithInfoGetter, Handle, Ptr>::Ptr m_Factory;
+    typename details::IFactory<TCPChannel, Handle, Ptr>::Ptr m_Factory;
 };
 
 } // namespace tcp

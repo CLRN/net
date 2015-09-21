@@ -9,29 +9,16 @@ namespace channels
 {
 
 //! Channel type
-template<typename Owner>
-class SyncStream : public net::details::Channel<typename Owner::Handle,
-                                                typename Owner::Queue,
-                                                typename Owner::Settings>
+template<typename Traits>
+class SyncStream : public net::details::Channel<Traits>
 {
 public:
-    typedef details::Channel<typename Owner::Handle,
-                             typename Owner::Queue,
-                             typename Owner::Settings> Base;
-    typedef boost::weak_ptr<Owner> OwnerPtr;
+    typedef details::Channel<Traits> Base;
 
     template<typename ... Args>
     SyncStream(const Args&... args)
         : Base(args...)
-        , m_Owner(hlp::Param<const boost::shared_ptr<Owner>>::Unpack(args...))
     {
-    }
-
-    virtual void Close() override
-    {
-        boost::system::error_code e;
-        Base::m_IoObject->shutdown(boost::asio::ip::tcp::socket::shutdown_both, e);
-        Base::Close();
     }
 
     //! Begin asynchronous read to buffer
@@ -40,7 +27,7 @@ public:
         boost::system::error_code e;
         const auto bytes = Base::m_IoObject->read_some(buffer, e);
         Base::m_IoObject->get_io_service().post(
-                boost::bind(&Base::ReadMessageCallback, Base::shared_from_this(), e, bytes));
+                boost::bind(&Base::ReadMessageCallback, Base::Shared(), e, bytes));
     }
 
 
@@ -53,22 +40,6 @@ public:
                                                 e);
         Base::WriteCallback(e, written, holder);
     }
-
-    virtual void ConnectionClosed() override
-    {
-        if (const auto owner = m_Owner.lock())
-            owner->ConnectionClosed(Base::shared_from_this());
-        if (Base::m_Callback)
-            Base::m_Callback(IConnection::StreamPtr());
-    }
-
-    typename Owner::Handle GetSocket() const
-    {
-        return Base::m_IoObject;
-    }
-
-private:
-    const OwnerPtr m_Owner;
 };
 
 } // namespace channels

@@ -23,7 +23,6 @@ class Transport
 {
 public:
     typedef TransportImpl<Channel, Queue, Settings> Impl;
-    typedef typename Impl::Endpoint Endpoint;
     typedef IConnection::StreamPtr Stream;
 
     template<typename ...Args>
@@ -34,13 +33,14 @@ public:
     }
 
     //! Connect to remote host
+    template<typename Endpoint>
     IConnection::Ptr Connect(const Endpoint& endpoint)
     {
         return m_Impl->Connect(endpoint);
     }
 
     //! Receive callback
-    template<typename Callback>
+    template<typename Endpoint, typename Callback>
     void Receive(const Endpoint& endpoint, const Callback& callback)
     {
         return m_Impl->Receive(endpoint, callback);
@@ -49,7 +49,8 @@ public:
     //! Stop all activity
     void Close()
     {
-        m_Impl->Close();
+        if (m_Impl)
+            m_Impl->Close();
     }
 
 private:

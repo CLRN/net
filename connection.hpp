@@ -2,8 +2,9 @@
 
 #include "details/memory.hpp"
 
-#include <boost/shared_ptr.hpp>
-#include <boost/function.hpp>
+#include <memory>
+#include <functional>
+
 #include <boost/noncopyable.hpp>
 
 namespace net
@@ -19,10 +20,10 @@ public:
     typedef boost::shared_ptr<IConnection> Ptr;
 
     //! Data pointer type
-    typedef boost::shared_ptr<std::istream> StreamPtr;
+    typedef std::unique_ptr<std::istream> StreamPtr;
 
     //! Callback function type
-    typedef boost::function<void (const StreamPtr& stream)> Callback;
+    typedef std::function<void (StreamPtr&& stream)> Callback;
 
     //! Prepare data buffer
     virtual Memory Prepare(std::size_t size) = 0;

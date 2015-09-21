@@ -9,21 +9,15 @@ namespace channels
 {
 
 //! Channel type
-template<typename Owner>
-class AsyncStream : public net::details::Channel<typename Owner::Handle,
-                                                typename Owner::Queue,
-                                                typename Owner::Settings>
+template<typename Traits>
+class AsyncStream : public net::details::Channel<Traits>
 {
 public:
-    typedef details::Channel<typename Owner::Handle,
-                             typename Owner::Queue,
-                             typename Owner::Settings> Base;
-    typedef boost::weak_ptr<Owner> OwnerPtr;
+    typedef details::Channel<Traits> Base;
 
     template<typename ... Args>
     AsyncStream(const Args&... args)
         : Base(args...)
-        , m_Owner(hlp::Param<const boost::shared_ptr<Owner>>::Unpack(args...))
     {
     }
 
@@ -39,7 +33,7 @@ public:
     {
         Base::m_IoObject->async_read_some(
             buffer,
-            boost::bind(&Base::ReadMessageCallback, Base::shared_from_this(), _1, _2)
+            boost::bind(&Base::ReadMessageCallback, Base::Shared(), _1, _2)
         );   
     }
 
@@ -53,26 +47,11 @@ public:
                 *Base::m_IoObject,
                 boost::asio::buffer(holder.m_Memory.get(), holder.m_Size),
                 boost::asio::transfer_exactly(holder.m_Size),
-                Base::m_Strand.wrap(boost::bind(&AsyncStream::WriteCallback, Base::shared_from_this(), _1, _2, holder))
+                Base::m_Strand.wrap(boost::bind(&AsyncStream::WriteCallback, Base::Shared(), _1, _2, holder))
         );
     }
 
-    virtual void ConnectionClosed() override
-    {
-        if (const auto owner = m_Owner.lock())
-            owner->ConnectionClosed(Base::shared_from_this());
 
-        if (Base::m_Callback)
-            Base::m_Callback(IConnection::StreamPtr());
-    }
-
-    typename Owner::Handle GetSocket() const
-    {
-        return Base::m_IoObject;
-    }
-
-private:
-    const OwnerPtr m_Owner;
 };
 
 } // namespace channels

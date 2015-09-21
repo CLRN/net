@@ -10,6 +10,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/random_generator.hpp>
 #include <boost/make_shared.hpp>
 
 namespace net
@@ -83,7 +84,7 @@ public:
                 if (!boost::filesystem::exists(m_FilePath))
                     boost::filesystem::create_directories(m_FilePath);
 
-                m_FilePath /= boost::uuids::to_string(boost::uuids::uuid());
+                m_FilePath /= boost::uuids::to_string(boost::uuids::random_generator()());
                 {
                     boost::filesystem::ofstream t(m_FilePath);
                 }

@@ -12,6 +12,7 @@
 #include <chrono>
 
 #include <boost/make_unique.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
 std::size_t StreamSize(std::istream& is)
 {
@@ -79,7 +80,7 @@ private:
 };
 
 template<typename Transport>
-class Server
+class Server : public boost::enable_shared_from_this<Server<Transport>>
 {
 public:
     Server(boost::asio::io_service& s, bool echo)
@@ -92,7 +93,7 @@ public:
 
     void Start(const std::string& ep)
     {
-        m_Transport.Receive(ep, boost::bind(&Server::OnClientConnected, this, _1, _2));
+        m_Transport.Receive(ep, boost::bind(&Server::OnClientConnected, this->shared_from_this(), _1, _2));
     }
 
     void OnClientConnected(const net::IConnection::Ptr& c, const boost::exception_ptr& e)
@@ -103,7 +104,7 @@ public:
             return;
         }
 
-        c->Receive(boost::bind(&Server::OnDataRead, this, _1, c));
+        c->Receive(boost::bind(&Server::OnDataRead, this->shared_from_this(), _1, c));
     }
 
     void OnDataRead(const typename Transport::Stream& stream, const net::IConnection::Ptr& c)
@@ -146,7 +147,7 @@ private:
 };
 
 template<typename Transport>
-class Client
+class Client : public boost::enable_shared_from_this<Client<Transport>>
 {
 public:
     Client(boost::asio::io_service& s, unsigned size)
@@ -161,8 +162,8 @@ public:
     {
         m_Connection = m_Transport.Connect(ep);
 
-        m_SendThread = boost::thread(boost::bind(&Client::Send, this));
-        m_Connection->Receive(boost::bind(&Client::OnDataRead, this, _1));
+        m_SendThread = boost::thread(boost::bind(&Client::Send, this->shared_from_this()));
+        m_Connection->Receive(boost::bind(&Client::OnDataRead, this->shared_from_this(), _1));
     }
 
     void Send()
@@ -243,39 +244,61 @@ public:
 
     void Do(unsigned seconds, unsigned size)
     {
-        const auto ep = "127.0.0.1:10000";
-
         boost::asio::io_service service;
-        m_Server.reset(new Server<T>(service, m_IsUsingEcho));
-        m_Client.reset(new Client<T>(service, size));
+        boost::thread_group pool;
+        std::unique_ptr<boost::asio::io_service::work> work;
 
-        m_Work = boost::make_unique<boost::asio::io_service::work>(service);
+        std::string ep;
+        const auto server = boost::make_shared<Server<T>>(service, m_IsUsingEcho);
+        do
+        {
+            try
+            {
+                static short port = 10000;
+                ep = "127.0.0.1:" + conv::cast<std::string>(port++);
+                server->Start(ep);
+            }
+            catch (const boost::system::system_error& e)
+            {
+                continue;
+            }
+        }
+        while (false);
+
+        const auto client = boost::make_shared<Client<T>>(service, size);
+
+        work = boost::make_unique<boost::asio::io_service::work>(service);
         for (unsigned i = 0; i < boost::thread::hardware_concurrency() * 2; ++i)
-            m_Pool.create_thread(boost::bind(&boost::asio::io_service::run, &service));
+            pool.create_thread(boost::bind(&boost::asio::io_service::run, &service));
 
-        m_Server->Start(ep);
-        service.post(boost::bind(&Client<T>::Start, m_Client.get(), ep));
+        service.post(boost::bind(&Client<T>::Start, client, ep));
 
-        const auto start = std::chrono::system_clock::now();
-        boost::this_thread::sleep(boost::posix_time::seconds(seconds));
-        const auto now = std::chrono::system_clock::now();
+        const auto start = std::chrono::high_resolution_clock::now();
+        std::chrono::high_resolution_clock::time_point now;
+        while (now - start < std::chrono::seconds(seconds))
+        {
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+            now = std::chrono::high_resolution_clock::now();
+        }
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
+
+        std::cout << ms.count() << std::endl;
 
         service.stop();
-        m_Work.reset();
+        work.reset();
 
-        m_Server->Stop();
-        m_Client->Stop();
-        m_Pool.join_all();
+        server->Stop();
+        client->Stop();
+        pool.join_all();
 
-        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
         const auto* const test_info = ::testing::UnitTest::GetInstance()->current_test_info();
         TestResult r =
         {
             std::string(test_info->test_case_name()) + ":" + test_info->name(),
-            m_Client->GetSendBytesSpeed(ms.count()),
-            m_Client->GetSendPacketSpeed(ms.count()),
-            m_IsUsingEcho ? m_Client->GetRecvBytesSpeed(ms.count()) : m_Server->GetBytesSpeed(ms.count()),
-            m_IsUsingEcho ? m_Client->GetRecvPacketSpeed(ms.count()) : m_Server->GetPacketSpeed(ms.count()),
+            client->GetSendBytesSpeed(ms.count()),
+            client->GetSendPacketSpeed(ms.count()),
+            m_IsUsingEcho ? client->GetRecvBytesSpeed(ms.count()) : server->GetBytesSpeed(ms.count()),
+            m_IsUsingEcho ? client->GetRecvPacketSpeed(ms.count()) : server->GetPacketSpeed(ms.count()),
         };
 
         ResultHolder::Instance().Add(std::move(r));
@@ -283,13 +306,6 @@ public:
 
 protected:
     bool m_IsUsingEcho;
-
-private:
-    boost::thread_group m_Pool;
-    std::unique_ptr<boost::asio::io_service::work> m_Work;
-
-    std::unique_ptr<Server<T>> m_Server;
-    std::unique_ptr<Client<T>> m_Client;
 };
 
 template <typename T>
@@ -306,67 +322,70 @@ public:
 TYPED_TEST_CASE_P(EchoSpeedTest);
 TYPED_TEST_CASE_P(SpeedTest);
 
+static const int seconds = 10;
+/*
 TYPED_TEST_P(EchoSpeedTest, VerySmallPacket)
 {
-    this->Do(10, 10);
+    this->Do(seconds, 10);
 }
 
 TYPED_TEST_P(EchoSpeedTest, SmallPacket)
 {
-    this->Do(10, 100);
+    this->Do(seconds, 100);
 }
 
 TYPED_TEST_P(EchoSpeedTest, OptimalPacket)
 {
-    this->Do(10, 4092);
+    this->Do(seconds, 4092);
 }
 
 TYPED_TEST_P(EchoSpeedTest, MediumPacket)
 {
-    this->Do(10, 4096);
+    this->Do(seconds, 4096);
 }
 
 TYPED_TEST_P(EchoSpeedTest, BigPacket)
 {
-    this->Do(10, 1024 * 1024);
+    this->Do(seconds, 1024 * 1024);
 }
-
+*/
 TYPED_TEST_P(SpeedTest, VerySmallPacket)
 {
-    this->Do(10, 10);
+    this->Do(seconds, 10);
 }
-
+/*
 TYPED_TEST_P(SpeedTest, SmallPacket)
 {
-    this->Do(10, 100);
+    this->Do(seconds, 100);
 }
 
 TYPED_TEST_P(SpeedTest, OptimalPacket)
 {
-    this->Do(10, 4092);
+    this->Do(seconds, 4092);
 }
 
 TYPED_TEST_P(SpeedTest, MediumPacket)
 {
-    this->Do(10, 4096);
+    this->Do(seconds, 4096);
 }
 
 TYPED_TEST_P(SpeedTest, BigPacket)
 {
-    this->Do(10, 1024 * 1024);
+    this->Do(seconds, 1024 * 1024);
 }
-
-
-REGISTER_TYPED_TEST_CASE_P(EchoSpeedTest,
-                           VerySmallPacket, SmallPacket, OptimalPacket, MediumPacket, BigPacket);
+*/
+//
+//REGISTER_TYPED_TEST_CASE_P(EchoSpeedTest,
+//                           VerySmallPacket, SmallPacket, OptimalPacket, MediumPacket, BigPacket);
 
 REGISTER_TYPED_TEST_CASE_P(SpeedTest,
-                           VerySmallPacket, SmallPacket, OptimalPacket, MediumPacket, BigPacket);
+                           VerySmallPacket/*, SmallPacket, OptimalPacket, MediumPacket, BigPacket*/);
 
-typedef net::Transport<net::tcp::Transport, net::channels::SyncStream> TcpTransport;
-typedef ::testing::Types<TcpTransport> Transports;
+typedef net::Transport<net::tcp::Transport, net::channels::SyncStream> TcpSyncTransport;
+typedef net::Transport<net::tcp::Transport, net::channels::AsyncStream> TcpAsyncTransport;
+typedef ::testing::Types<TcpAsyncTransport> Transports;
 
-INSTANTIATE_TYPED_TEST_CASE_P(TransportSpeedTest, EchoSpeedTest, Transports);
+//INSTANTIATE_TYPED_TEST_CASE_P(TransportSpeedTest, EchoSpeedTest, Transports);
 INSTANTIATE_TYPED_TEST_CASE_P(TransportSpeedTest, SpeedTest, Transports);
 
 /*
