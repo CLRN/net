@@ -424,6 +424,7 @@ private:
         };
 
         const auto stream = boost::make_shared<StreamWithMemory>(data, m_MessageSize, m_ReadBuffer);
+        *stream << std::noskipws;
 
         // invoke callback
         Base::m_Callback(stream);
