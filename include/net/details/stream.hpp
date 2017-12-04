@@ -9,6 +9,15 @@
 namespace net
 {
 
+inline std::size_t StreamSize(std::istream& is)
+{
+    const auto pos = is.tellg();
+    is.seekg(0, std::ios::end);
+    const auto size = static_cast<std::size_t>(is.tellg() - pos);
+    is.seekg(pos);
+    return size;
+}
+
 inline void CopyStream(std::istream& is, std::ostream& os, std::size_t size = 0)
 {
     // write stream data if available

@@ -1,19 +1,11 @@
 #include "net/ipc.hpp"
 #include "net/tcp.hpp"
+#include "net/details/stream.hpp"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
 #include <boost/thread.hpp>
-
-std::size_t StreamSize(std::istream& is)
-{
-    const auto pos = is.tellg();
-    is.seekg(0, std::ios::end);
-    const auto size = static_cast<std::size_t>(is.tellg() - pos);
-    is.seekg(pos);
-    return size;
-}
 
 std::size_t CopyStream(std::istream& is, net::IConnection& c)
 {
