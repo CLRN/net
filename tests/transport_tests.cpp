@@ -9,7 +9,7 @@
 
 std::size_t CopyStream(std::istream& is, net::IConnection& c)
 {
-    const auto size = StreamSize(is);
+    const auto size = net::StreamSize(is);
     std::vector<char> buffer(size);
 
     std::copy(std::istream_iterator<char>(is), std::istream_iterator<char>(), buffer.begin());
@@ -36,7 +36,7 @@ TEST(Transport, Echo)
                                     {
                                         if (stream)
                                         {
-                                            std::cout << "echo: " << StreamSize(*stream) << std::endl;
+                                            std::cout << "echo: " << net::StreamSize(*stream) << std::endl;
                                             CopyStream(*stream, *connection);
                                         }
                                     });
