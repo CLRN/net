@@ -274,7 +274,7 @@ private:
         FileSinkChunk(uint64_t size, std::atomic<std::size_t>& counter)
             : MemoryChunk(size, false)
             , m_Counter(counter)
-            , m_Path(boost::filesystem::path("temp") / (boost::lexical_cast<std::string>(boost::uuids::random_generator{}()) + ".netmem"))
+            , m_Path(boost::filesystem::path("/tmp") / (boost::lexical_cast<std::string>(boost::uuids::random_generator{}()) + ".netmem"))
         {
             Open(size);
             ++m_Counter;
