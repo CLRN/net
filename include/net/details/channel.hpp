@@ -25,13 +25,29 @@ namespace details
 
 #pragma pack(push, 1)
 
-struct Header
+struct DefaultHeader
 {
     uint32_t m_Size;
     uint64_t m_BytesReceived;
+
+    static size_t Size()
+    {
+        return sizeof(DefaultHeader);
+    }
+
+    void Serialize(details::IData& data)
+    {
+        data.Write(this, Size());
+    }
+
+    void Deserialize(const char* data)
+    {
+        m_Size = reinterpret_cast<const DefaultHeader&>(*data).m_Size;
+        m_BytesReceived = reinterpret_cast<const DefaultHeader&>(*data).m_BytesReceived;
+    }
 };
 
-struct RestorationHeader : public Header
+struct RestorationHeader : public DefaultHeader
 {
     uint32_t m_Crc32;
 
@@ -54,6 +70,7 @@ class Channel : public BaseChannel<Traits>
 {
     typedef BaseChannel<Traits> Base;
     typedef typename Traits::Settings Settings;
+    typedef typename Traits::Header Header;
 public:
     typedef boost::shared_ptr<Channel<Traits>> Ptr;
 
@@ -105,9 +122,9 @@ protected:
         header.m_Size = size;
         header.m_BytesReceived = m_ReceivedBytesLocal;
 
-        const auto headerSize = sizeof(Header);
+        const auto headerSize = header.Size();
         const auto data = m_Queue.Prepare(size + headerSize);
-        data->Write(&header, headerSize);
+        header.Serialize(*data);
         return data;
     }
 
@@ -303,7 +320,7 @@ public:
             const auto remainingBytes = m_ReadBytes - m_ParsedBytes;
 
             // copy remaining not parsed data to new buffer
-            m_BufferSize = std::max(m_Settings.GetBufferSize(), m_MessageSize + sizeof(Header));
+            m_BufferSize = std::max(m_Settings.GetBufferSize(), m_MessageSize + Header::Size());
             assert(m_BufferSize > remainingBytes);
             freeSpace = m_BufferSize - remainingBytes;
 
@@ -354,7 +371,7 @@ private:
             // unparsed bytes amount
             assert(m_ReadBytes >= m_ParsedBytes);
             const auto toParse = m_ReadBytes - m_ParsedBytes;
-            if (toParse <= sizeof(Header))
+            if (toParse <= Header::Size())
             {
                 // incomplete packet size
                 break;
@@ -373,13 +390,14 @@ private:
 
             // obtain current message size
             const char* currentMessageBegin = &m_ReadBuffer[m_ParsedBytes];
-            const auto& header = reinterpret_cast<const Header&>(*currentMessageBegin);
+            Header header = {};
+            header.Deserialize(currentMessageBegin);
             m_MessageSize = header.m_Size;
 
             // check for complete packet
-            if (m_MessageSize <= toParse - sizeof(Header))
+            if (m_MessageSize <= toParse - Header::Size())
             {
-                const char* data = &m_ReadBuffer[m_ParsedBytes + sizeof(Header)];
+                const char* data = &m_ReadBuffer[m_ParsedBytes + Header::Size()];
                 if (Settings::IsPersistent())
                 {
                     m_Queue.UpdateAcknowledgedBytes(header.m_BytesReceived);
@@ -388,7 +406,7 @@ private:
                 if (m_MessageSize)
                     InvokeCallback(data);
 
-                m_ParsedBytes += (m_MessageSize + sizeof(Header));
+                m_ParsedBytes += (m_MessageSize + Header::Size());
                 assert(m_ReadBytes >= m_ParsedBytes);
                 if (m_ReadBytes < m_ParsedBytes)
                 {

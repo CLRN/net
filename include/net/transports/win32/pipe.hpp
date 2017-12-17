@@ -27,15 +27,16 @@ template
 <
     template<typename> class Channel,
     template<typename> class QueueImpl,
+    typename Header = details::DefaultHeader,
     typename Settings = DefaultSettings
 >
-class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, Settings>>
+class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, Header, Settings>>
 {
     typedef pipes::Pipe::Ptr Handle;
     typedef QueueImpl<Settings> Queue;
-    typedef Transport<Channel, QueueImpl, Settings> ThisType;
+    typedef Transport<Channel, QueueImpl, Header, Settings> ThisType;
     typedef boost::enable_shared_from_this<ThisType> Shared;
-    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType> Traits;
+    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType, Header> Traits;
 
 public:
     typedef boost::shared_ptr<Transport> Ptr;

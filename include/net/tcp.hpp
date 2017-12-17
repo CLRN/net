@@ -12,7 +12,8 @@ namespace net
 typedef net::Transport<net::tcp::Transport, net::channels::AsyncStream> Tcp;
 typedef net::Transport<net::tcp::Transport, 
                        net::channels::AsyncStream, 
-                       net::details::PersistentQueue, 
+                       net::details::PersistentQueue,
+                       net::details::DefaultHeader,
                        net::PersistentSettings> PersistentTcp;
 
 namespace tcp

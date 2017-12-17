@@ -22,6 +22,7 @@ template
 <
     template<typename> class Channel,
     template<typename> class QueueImpl,
+    typename Header = details::DefaultHeader,
     typename SettingsImpl = DefaultSettings
 >
 class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, SettingsImpl>>
@@ -35,8 +36,8 @@ public:
     typedef QueueImpl<Settings> Queue;
     typedef boost::shared_ptr<Socket> Handle;
     typedef std::string Endpoint;
-    typedef Transport<Channel, QueueImpl, Settings> ThisType;
-    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType> Traits;
+    typedef Transport<Channel, QueueImpl, Header, Settings> ThisType;
+    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType, Header> Traits;
     typedef Channel<Traits> ChannelImpl;
     typedef boost::function<void(const IConnection::Ptr& connection,
                                  const boost::exception_ptr& e)> Callback;

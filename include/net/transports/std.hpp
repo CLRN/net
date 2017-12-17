@@ -36,9 +36,10 @@ template
 <
     template<typename> class Channel,
     template<typename> class QueueImpl,
+    typename Header = details::DefaultHeader,
     typename Settings = DefaultSettings
 >
-class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, Settings>>
+class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, Header, Settings>>
 {
 public:
 #if defined(BOOST_WINDOWS_API)
@@ -50,9 +51,9 @@ public:
     typedef boost::shared_ptr<Pipe> Handle;
 private:
     typedef QueueImpl<Settings> Queue;
-    typedef Transport<Channel, QueueImpl, Settings> ThisType;
+    typedef Transport<Channel, QueueImpl, Header, Settings> ThisType;
     typedef boost::enable_shared_from_this<ThisType> Shared;
-    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType> Traits;
+    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType, Header> Traits;
     typedef std::pair<Handle, Handle> Endpoints;
 
 public:

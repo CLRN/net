@@ -1,6 +1,6 @@
 #pragma once
 
-#include "conversion/cast.h"
+#include "conversion/cast.hpp"
 #include "log/log.h"
 
 #include "net/details/params.hpp"
@@ -11,11 +11,7 @@
 #include "net/details/channel.hpp"
 
 #include <boost/asio.hpp>
-//#include <boost/asio/local/stream_protocol.hpp>
-//#include <boost/algorithm/string/split.hpp>
-//#include <boost/algorithm/string/classification.hpp>
-//#include <boost/range/algorithm.hpp>
-//#include <boost/bind.hpp>
+
 #include <boost/weak_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
@@ -29,16 +25,17 @@ template
 <
     template<typename> class Channel,
     template<typename> class QueueImpl,
+    typename Header = details::DefaultHeader,
     typename Settings = DefaultSettings
 >
-class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, Settings>>
+class Transport : public boost::enable_shared_from_this<Transport<Channel, QueueImpl, Header, Settings>>
 {
     typedef boost::asio::local::stream_protocol::socket Socket;
     typedef boost::shared_ptr<Socket> Handle;
     typedef QueueImpl<Settings> Queue;
-    typedef Transport<Channel, QueueImpl, Settings> ThisType;
+    typedef Transport<Channel, QueueImpl, Header, Settings> ThisType;
     typedef boost::enable_shared_from_this<ThisType> Shared;
-    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType> Traits;
+    typedef net::details::ChannelTraits<Handle, Queue, Settings, ThisType, Header> Traits;
 
 public:
     typedef boost::shared_ptr<Transport> Ptr;

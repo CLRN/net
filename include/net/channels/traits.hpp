@@ -5,17 +5,19 @@ namespace net
 namespace details
 {
 
-template<typename H,
-         typename Q,
-         typename S,
-         typename T>
+template<typename HandleType,
+         typename QueueType,
+         typename SettingsType,
+         typename TransportType,
+         typename HeaderType>
 class ChannelTraits
 {
 public:
-    typedef H Handle;
-    typedef Q Queue;
-    typedef S Settings;
-    typedef T Transport;
+    typedef HandleType Handle;
+    typedef QueueType Queue;
+    typedef SettingsType Settings;
+    typedef TransportType Transport;
+    typedef HeaderType Header;
 };
 
 } // namespace details
