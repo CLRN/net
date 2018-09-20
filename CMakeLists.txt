@@ -8,7 +8,7 @@ add_subdirectory(log)
 set(BOOST_COMPONENTS system iostreams filesystem)
 find_package(Boost COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
 
-file(GLOB_RECURSE SOURCES "include/*.hpp")
+file(GLOB_RECURSE SOURCES "include/*.hpp" "src/dummy.cpp")
 if(WIN32)
     file(GLOB WIN32_SOURCES "include/net/transports/win32/*.hpp")
     set(SOURCES ${SOURCES} ${WIN32_SOURCES})

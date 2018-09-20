@@ -301,7 +301,7 @@ private:
             m_Data = m_Sink.data();
         }
 
-        void Close()
+        void Close() override
         {
             m_Sink.close();
             m_Data = nullptr;

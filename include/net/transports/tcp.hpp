@@ -864,7 +864,7 @@ private:
             << net::SysErrorInfo(boost::system::error_code(WSAGetLastError(), boost::system::system_category())));
     }
 
-#else
+#elif UNIX
 
     void EnableTcpKeepAlive(int socket, int timeout, int interval)
     {
@@ -883,6 +883,28 @@ private:
         if (result != 0)
             BOOST_THROW_EXCEPTION(net::Exception("Failed to enable TCP interval.")
             << net::SysErrorInfo(boost::system::error_code(errno, boost::system::system_category())));
+    }
+
+#else // MACOS
+
+
+    void EnableTcpKeepAlive(int socket, int timeout, int interval)
+    {
+        const int enableKeepalive{ 1 };
+        int result{ setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, &enableKeepalive, sizeof enableKeepalive) };
+        if (result != 0)
+            BOOST_THROW_EXCEPTION(net::Exception("Failed to enable TCP keepalive.")
+                                          << net::SysErrorInfo(boost::system::error_code(errno, boost::system::system_category())));
+
+        result = setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, &timeout, sizeof timeout);
+        if (result != 0)
+            BOOST_THROW_EXCEPTION(net::Exception("Failed to enable TCP timeout.")
+                                          << net::SysErrorInfo(boost::system::error_code(errno, boost::system::system_category())));
+
+        result = setsockopt(socket, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof interval);
+        if (result != 0)
+            BOOST_THROW_EXCEPTION(net::Exception("Failed to enable TCP interval.")
+                                          << net::SysErrorInfo(boost::system::error_code(errno, boost::system::system_category())));
     }
 
 #endif  // _WIN32
